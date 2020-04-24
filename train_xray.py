@@ -76,6 +76,7 @@ vae = ConvVAE(arch_dict,
 print('Built model.')
 print(vae.__str__())
 
+# ToDo -- note which input you're feeding
 resdict = {}
 vae.fit([None, None, None], 
         [None, None, None], 
