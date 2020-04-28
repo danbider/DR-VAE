@@ -57,8 +57,10 @@ if args.dataset_size is not None:
     random_indices = np.random.choice(len(d_kaggle),
                                       size=args.dataset_size,
                                       replace=False)
-    subset_dataset = torch.utils.data.Subset(d_kaggle, random_indices)
+    dataset = torch.utils.data.Subset(d_kaggle, random_indices)
     print('training-testing on a subset of %i images' % args.dataset_size)
+else:
+    dataset = d_kaggle
 
 # make arch dict for VAE from ae_arch_new.json
 arch_dict = load_handcrafted_arch(ae_arch_json=os.path.join(
@@ -80,7 +82,7 @@ print(vae.__str__())
 resdict = {}
 vae.fit([None, None, None], 
         [None, None, None], 
-        dataset = subset_dataset, # note the dataset input.
+        dataset = dataset, # note the dataset input.
         epochs = args.num_epochs,
         log_interval = 2,
         epoch_log_interval = 4,
