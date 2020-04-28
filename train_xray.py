@@ -34,7 +34,6 @@ parser.add_argument('--num_latents', type=int, default=100, help='')
 parser.add_argument('--dataset_size', type=int, default=None, help='')
 
 args, _ = parser.parse_known_args()
-
 output_dir = os.path.join("./vae-xray", args.training_outcome)
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -50,6 +49,8 @@ d_kaggle = xrv.datasets.Kaggle_Dataset(
                           'stage_2_train_images_jpg'),
     csvpath=os.path.join(parent_dir, 'xray-datasets', 'kaggle-pneumonia-jpg',
                           'stage_2_train_labels.csv'),
+    dicomcsvpath = os.path.join(parent_dir, 'xray-datasets', 'kaggle-pneumonia-jpg',
+                          'kaggle_stage_2_train_images_dicom_headers.csv.gz'),
     transform=transform)
 
 # toy dataset

@@ -237,7 +237,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
     #trues, preds = [], []
     #t = tqdm(train_loader) # and also had t instead of train loader inside brackets.
     for batch_idx, samples in enumerate(train_loader):
-        data = samples["PA"].float()
+        data = samples["img"].float()
         target = samples["lab"]
 
         if do_cuda:
