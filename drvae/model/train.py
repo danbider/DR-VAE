@@ -69,6 +69,7 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
 
     # create model
     if do_cuda:
+        print('doing cuda')
         model.cuda()
         model.is_cuda = True
 
