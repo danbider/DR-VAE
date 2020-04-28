@@ -32,6 +32,8 @@ parser.add_argument('--num_epochs', type=int, default=160, help='')
 parser.add_argument('--batch_size', type=int, default=64, help='')
 parser.add_argument('--num_latents', type=int, default=100, help='')
 parser.add_argument('--dataset_size', type=int, default=None, help='')
+parser.add_argument('--log_interval', type=int, default=None, help='')
+
 
 args, _ = parser.parse_known_args()
 output_dir = os.path.join("./vae-xray", args.training_outcome)
@@ -88,8 +90,8 @@ vae.fit([None, None, None],
         [None, None, None], 
         dataset = dataset, # note the dataset input.
         epochs = args.num_epochs,
-        log_interval = 2,
-        epoch_log_interval = 4,
+        log_interval = args.log_interval,
+        epoch_log_interval = 2,
         plot_interval = 3,
         output_dir = "vae-xray",
         torch_seed= int(0),
