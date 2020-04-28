@@ -63,9 +63,9 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
         test_epoch_func = test_epoch
     # below applies for both
     train_loader = torch.utils.data.DataLoader(train_data, 
-        batch_size=batch_size, num_workers=4, shuffle=True)
+        batch_size=batch_size, num_workers=8, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_data,
-        batch_size=batch_size, num_workers=4, shuffle=True)
+        batch_size=batch_size, num_workers=8, shuffle=True)
 
     # create model
     if do_cuda:
