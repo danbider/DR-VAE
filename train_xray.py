@@ -79,6 +79,9 @@ vae = ConvVAE(arch_dict,
 print('Built model.')
 print(vae.__str__())
 
+print('cuda check:')
+print(torch.cuda.is_available())
+
 # ToDo -- note which input you're feeding
 resdict = {}
 vae.fit([None, None, None], 
