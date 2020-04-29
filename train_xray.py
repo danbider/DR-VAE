@@ -18,8 +18,9 @@ import commentjson
 from drvae.model.ae_model_architecture_generator import *
 from drvae.model.vae import ConvVAE
 import argparse, os, shutil, time, sys, pyprind, pickle
-
+import warnings
 import os,sys,inspect
+import cv2
 current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
 
@@ -34,18 +35,32 @@ parser.add_argument('--num_latents', type=int, default=100, help='')
 parser.add_argument('--dataset_size', type=int, default=None, help='')
 parser.add_argument('--log_interval', type=int, default=None, help='')
 
+class XRayResizer(object):
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, img):
+        '''img: [None, img.shape[0], img.shape[1]] array'''
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            img = img[0,:,:]
+            return cv2.resize(img, (self.size, self.size), 
+                         interpolation = cv2.INTER_AREA).reshape(
+                                1,self.size,self.size).astype(
+                                    np.float32)
 
 args, _ = parser.parse_known_args()
 output_dir = os.path.join("./vae-xray", args.training_outcome)
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-# define an image transformation for the dataset.
+# define an image transformation for the dataset (in addition to torchxrayvision)
+# note, didn't xrv's XRayResizer.
 transform = torchvision.transforms.Compose(
     [xrv.datasets.XRayCenterCrop(),
-      xrv.datasets.XRayResizer(args.image_size)]) # final val be 224. shrink just for test ma
+      XRayResizer(args.image_size)]) # typically 224
 
-# define a torchxrayvision dataset
+# initialize a torchxrayvision dataset instance
 d_kaggle = xrv.datasets.Kaggle_Dataset(
     imgpath=os.path.join(parent_dir, 'xray-datasets', 'kaggle-pneumonia-jpg',
                           'stage_2_train_images_jpg'),
@@ -55,7 +70,7 @@ d_kaggle = xrv.datasets.Kaggle_Dataset(
                           'kaggle_stage_2_train_images_dicom_headers.csv.gz'),
     transform=transform)
 
-# toy dataset
+# if train on test on a subset of the data
 if args.dataset_size is not None:
     random_indices = np.random.choice(len(d_kaggle),
                                       size=args.dataset_size,
