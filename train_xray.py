@@ -34,6 +34,7 @@ parser.add_argument('--batch_size', type=int, default=64, help='')
 parser.add_argument('--num_latents', type=int, default=100, help='')
 parser.add_argument('--dataset_size', type=int, default=None, help='')
 parser.add_argument('--log_interval', type=int, default=None, help='')
+parser.add_argument('--ignore_warnings', action="store_true")
 
 class XRayResizer(object):
     def __init__(self, size):
@@ -42,7 +43,7 @@ class XRayResizer(object):
     def __call__(self, img):
         '''img: [None, img.shape[0], img.shape[1]] array'''
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+            warnings.simplefilter("default")
             img = img[0,:,:]
             return cv2.resize(img, (self.size, self.size), 
                          interpolation = cv2.INTER_AREA).reshape(
