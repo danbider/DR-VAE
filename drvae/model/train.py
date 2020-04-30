@@ -266,9 +266,11 @@ def train_epoch_xraydata(epoch, model, train_loader,
             print(np.max(recon_batch.detach().cpu().numpy().flatten()))
             print('mu is nan:')
             print(np.sum(np.isnan(mu.detach().cpu().numpy().flatten())))
+            print(mu.detach().cpu().numpy().flatten())
             print(np.max(mu.detach().cpu().numpy().flatten()))
             print('lnvar is nan:')
             print(np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())))
+            print(logvar.detach().cpu().numpy().flatten())
             print(np.max(logvar.detach().cpu().numpy().flatten()))
 
 
