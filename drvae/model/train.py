@@ -257,19 +257,19 @@ def train_epoch_xraydata(epoch, model, train_loader,
             loss += model.lossfun(data, recon_batch, target, mu, logvar)
             
             print('data is nan:')
-            print(np.sum(np.isnan(data.detach().numpy().flatten())))
-            print(np.max(data.detach().numpy().flatten()))
+            print(np.sum(np.isnan(data.detach().cpu().numpy().flatten())))
+            print(np.max(data.detach().cpu().numpy().flatten()))
             print('data raw:')
             print(data)
             print('recon is nan:')
-            print(np.sum(np.isnan(recon_batch.detach().numpy().flatten())))
-            print(np.max(recon_batch.detach().numpy().flatten()))
+            print(np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())))
+            print(np.max(recon_batch.detach().cpu().numpy().flatten()))
             print('mu is nan:')
-            print(np.sum(np.isnan(mu.detach().numpy().flatten())))
-            print(np.max(mu.detach().numpy().flatten()))
+            print(np.sum(np.isnan(mu.detach().cpu().numpy().flatten())))
+            print(np.max(mu.detach().cpu().numpy().flatten()))
             print('lnvar is nan:')
-            print(np.sum(np.isnan(logvar.detach().numpy().flatten())))
-            print(np.max(logvar.detach().numpy().flatten()))
+            print(np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())))
+            print(np.max(logvar.detach().cpu().numpy().flatten()))
 
 
         if do_train:
