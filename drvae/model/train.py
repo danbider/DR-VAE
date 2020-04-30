@@ -255,6 +255,22 @@ def train_epoch_xraydata(epoch, model, train_loader,
             recon_batch, z, mu, logvar = model(data)
             # model computes its own loss
             loss += model.lossfun(data, recon_batch, target, mu, logvar)
+            
+            print('data is nan:')
+            print(np.sum(np.isnan(data.detach().numpy().flatten())))
+            print(np.max(data.detach().numpy().flatten()))
+            print('data raw:')
+            print(data)
+            print('recon is nan:')
+            print(np.sum(np.isnan(recon_batch.detach().numpy().flatten())))
+            print(np.max(recon_batch.detach().numpy().flatten()))
+            print('mu is nan:')
+            print(np.sum(np.isnan(mu.detach().numpy().flatten())))
+            print(np.max(mu.detach().numpy().flatten()))
+            print('lnvar is nan:')
+            print(np.sum(np.isnan(logvar.detach().numpy().flatten())))
+            print(np.max(logvar.detach().numpy().flatten()))
+
 
         if do_train:
             loss.backward()
