@@ -256,26 +256,32 @@ def train_epoch_xraydata(epoch, model, train_loader,
             # model computes its own loss
             loss += model.lossfun(data, recon_batch, target, mu, logvar)
             
-            print('data is nan:')
-            print(np.sum(np.isnan(data.detach().cpu().numpy().flatten())))
-            print(np.min(data.detach().cpu().numpy().flatten()))
-            print(np.max(data.detach().cpu().numpy().flatten()))
-            print('data raw:')
-            print(data)
-            print('recon is nan:')
-            print(np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())))
-            print(np.min(recon_batch.detach().cpu().numpy().flatten()))
-            print(np.max(recon_batch.detach().cpu().numpy().flatten()))
-            print('mu is nan:')
-            print(np.sum(np.isnan(mu.detach().cpu().numpy().flatten())))
-            print(mu.detach().cpu().numpy().flatten())
-            print(np.min(mu.detach().cpu().numpy().flatten()))
-            print(np.max(mu.detach().cpu().numpy().flatten()))
-            print('lnvar is nan:')
-            print(np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())))
-            print(logvar.detach().cpu().numpy().flatten())
-            print(np.min(logvar.detach().cpu().numpy().flatten()))
-            print(np.max(logvar.detach().cpu().numpy().flatten()))
+            
+            if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
+                np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())) !=0 or \
+                np.sum(np.isnan(mu.detach().cpu().numpy().flatten())) !=0 or \
+                np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())) !=0: \
+                
+                print('data is nan:')
+                print(np.sum(np.isnan(data.detach().cpu().numpy().flatten())))
+                print(np.min(data.detach().cpu().numpy().flatten()))
+                print(np.max(data.detach().cpu().numpy().flatten()))
+                print('data raw:')
+                print(data)
+                print('recon is nan:')
+                print(np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())))
+                print(np.min(recon_batch.detach().cpu().numpy().flatten()))
+                print(np.max(recon_batch.detach().cpu().numpy().flatten()))
+                print('mu is nan:')
+                print(np.sum(np.isnan(mu.detach().cpu().numpy().flatten())))
+                print(mu.detach().cpu().numpy().flatten())
+                print(np.min(mu.detach().cpu().numpy().flatten()))
+                print(np.max(mu.detach().cpu().numpy().flatten()))
+                print('lnvar is nan:')
+                print(np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())))
+                print(logvar.detach().cpu().numpy().flatten())
+                print(np.min(logvar.detach().cpu().numpy().flatten()))
+                print(np.max(logvar.detach().cpu().numpy().flatten()))
 
 
         if do_train:
