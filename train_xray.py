@@ -104,7 +104,7 @@ print(torch.cuda.is_available())
 
 # ToDo -- note which input you're feeding
 resdict = {}
-vae.fit([None, None, None], 
+rundict = vae.fit([None, None, None], 
         [None, None, None], 
         dataset = dataset, # note the dataset input.
         epochs = args.num_epochs,
@@ -119,8 +119,10 @@ resdict['vae'] = vae
 
 with open(os.path.join(output_dir, "resdict.pkl"), 'wb') as f:
             pickle.dump(resdict, f)
+with open(os.path.join(output_dir, "rundict.pkl"), 'wb') as f:
+            pickle.dump(rundict, f)
 
-# another option.
+# another option - maybe easier to load on CPU
 #torch.save(vae, join(cfg.output_dir, f'{dataset_name}-best.pt'))
 
 
