@@ -173,7 +173,8 @@ class ConvVAE(VAE):
         no need to worry about that outside of this module.'
         """
         if self.scale_pixels:
-            x = x/2048.0 + 0.5
+            #x = x/2048.0 + 0.5
+            x = x/1024.0
         mu, lnvar, pool_idx, outsize = self.encoding_net(x, dataset=dataset)
             # now we reparametrize and push through decoder
         if use_mean:
@@ -182,7 +183,8 @@ class ConvVAE(VAE):
             z = self.reparameterize(mu, lnvar) # sample using reparam trick
         x_bar = self.decoding_net(z , pool_idx, outsize, dataset=dataset)
         if self.scale_pixels:
-            x_bar = (x_bar - 0.5)*2048.0
+            #x_bar = (x_bar - 0.5)*2048.0
+            x_bar = x_bar*1024.0
 
         return x_bar, z, mu, lnvar
     

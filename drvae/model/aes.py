@@ -338,6 +338,11 @@ class ConvAEDecoder(nn.Module):
                         # last layer: no batch norm/sigmoid nonlin
                         self.decoder.add_module(
                             str('sigmoid%i' % global_layer_num), nn.Sigmoid())
+                    elif self.hparams['ae_decoding_final_nonlin'] == 'clamp':
+                        self.decoder.add_module(
+                            str('clamp%i' % global_layer_num), 
+                                MyClampFunction(min=self.hparams['clamp_minmax'][0],
+                                                max = self.hparams['clamp_minmax'][1]))
                 else:
                     if self.hparams['ae_batch_norm']:
                         module = nn.BatchNorm2d(
@@ -366,7 +371,6 @@ class ConvAEDecoder(nn.Module):
                 str('last_ff%i' % global_layer_num), module)
             if self.hparams['ae_decoding_final_nonlin'] == 'sigmoid':
                 # dan: added this condition.
-                print('finishing up with a sigmoid')
                 self.decoder.add_module(
                     str('sigmoid%i' % global_layer_num), nn.Sigmoid())
 
@@ -763,3 +767,15 @@ class AE(nn.Module):
         else:
             raise ValueError('"%s" is an invalid model_type' % self.model_type)
         return y, x
+    
+class MyClampFunction(nn.Module):
+    '''inheriting from nn.Module to add into nn.Sequential'''
+    # https://discuss.pytorch.org/t/customize-an-activation-function/1652/6
+
+    def __init__(self, min=-1.0, max=1.0):
+        super(MyClampFunction, self).__init__()
+        self.min = min
+        self.max = max
+
+    def forward(self, x):
+        return torch.clamp(x, min=self.min, max=self.max)

@@ -89,7 +89,9 @@ arch_dict = load_handcrafted_arch(ae_arch_json=os.path.join(
                                   check_memory=False)
 # add a couple of entries
 arch_dict["model_class"] = 'vae'
-arch_dict['ae_decoding_final_nonlin'] = 'sigmoid' # [str] 'linear' | 'sigmoid', if image is on [0,1]
+arch_dict['ae_decoding_final_nonlin'] = 'clamp' # [str] 'linear' | 'sigmoid', if image is on [0,1] | 'clamp'
+arch_dict['clamp_minmax'] = [-1.0,1.0]
+
 
 vae = ConvVAE(arch_dict, 
               scale_pixels = True)
