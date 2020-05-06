@@ -115,7 +115,8 @@ else:
     model = ConvDRVAE(arch_dict, 
                   scale_pixels = True)
     model.set_discrim_model(discriminator, 
-                            discrim_beta = args.beta)
+                            discrim_beta = args.beta,
+                            dim_out_to_use=8)
 
 print('Built model.')
 print(model.__str__())
