@@ -16,7 +16,7 @@ import numpy as np
 #import matplotlib.pyplot as plt
 #import commentjson
 from drvae.model.ae_model_architecture_generator import *
-from drvae.model.vae import ConvVAE
+from drvae.model.vae import ConvVAE, ConvDRVAE
 import argparse, os, shutil, time, sys, pyprind, pickle
 import warnings
 import inspect
