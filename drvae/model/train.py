@@ -16,6 +16,7 @@ import os, sys #; sys.path.append("../experiments-pause")
 import matplotlib.pyplot as plt; plt.ion()
 import seaborn as sns; sns.set_style("white")
 sns.set_palette(sns.color_palette("Set2", 10))
+torch.autograd.set_detect_anomaly(True)
 
 import numpy as np
 ln2pi = np.log(2*np.pi)
