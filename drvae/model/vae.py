@@ -511,7 +511,8 @@ def recon_loglike_function(recon_x, x, noise_var=.1*.1):
     print('recon_x')
     print(recon_x)
     print('diff_squared')
-    print(diff**diff)
+    print(diff*diff)
+    print('loglike')
     print(ll)
     return ll
 
