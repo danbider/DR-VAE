@@ -29,6 +29,8 @@ class VAE(base.Model):
             self.ll_fun = recon_loglike_function
         elif ll_name == "bernoulli":
             self.ll_fun = binary_recon_loglike_function
+        elif ll_name == "mse":
+            self.ll_fun = mse_loss
 
         print(ll_name)
         print(self.ll_fun)
@@ -68,6 +70,7 @@ class VAE(base.Model):
             errors.append(err.cpu())
         return torch.cat(errors)
 
+    # andy's version
     def lossfun(self, data, recon_data, target, mu, logvar):
         # added contiguous() for running things on a CPU. 
         # https://github.com/agrimgupta92/sgan/issues/22
@@ -76,7 +79,11 @@ class VAE(base.Model):
             recon_data.contiguous().view(recon_data.shape[0], -1),
             data.contiguous().view(data.shape[0], -1))
         kl_to_prior = kldiv_to_std_normal(mu, logvar)
-        return -torch.mean(recon_ll - kl_to_prior)
+        
+        if self.ll_fun == mse_loss:
+            return torch.mean(recon_ll + kl_to_prior)
+        else:
+            return -torch.mean(recon_ll - kl_to_prior)
 
 class ConvVAE(VAE):
       def __init__(self, hparams, **kwargs):
@@ -498,8 +505,10 @@ class BeatMlpCondVAE(VAE):
 ###################
 # Loss functions  #
 ###################
+def mse_loss(recon_x, x):
+    return torch.mean((recon_x - x) ** 2, dim=1)
 
-def recon_loglike_function(recon_x, x, noise_var=.01*.01):
+def recon_loglike_function(recon_x, x, noise_var=.1*.1): # was .1
     num_obs_per_batch = x.shape[1]
     ln_noise_var = np.log(noise_var)
     diff = x - recon_x
