@@ -190,8 +190,8 @@ class ConvDRVAE(ConvVAE):
         # # assert that there are 0 trainalbe params in discrim model
         # assert(len(list(filter(lambda p: p.requires_grad, 
         #                        discrim_model.parameters())))==0)
-        #self.discrim_model = [discrim_model]
-        self.discrim_model = discrim_model
+        self.discrim_model = [discrim_model]
+        #self.discrim_model = discrim_model
         self.discrim_beta = discrim_beta
         self.dim_out_to_use = dim_out_to_use # chose dimension of the discrim output
 
