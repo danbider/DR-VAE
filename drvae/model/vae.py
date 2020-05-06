@@ -201,6 +201,7 @@ class ConvDRVAE(ConvVAE):
             data, recon_data, target, mu, logvar)
 
         if self.discrim_beta == 0:
+            print('here at beta=0')
             return vae_loss
 
         # push data and recond through discrim_model
