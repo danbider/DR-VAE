@@ -118,7 +118,7 @@ else:
                             discrim_beta = args.beta)
 
 print('Built model.')
-print(vae.__str__())
+print(model.__str__())
 
 print('check if cuda.is_available():')
 print(torch.cuda.is_available())
