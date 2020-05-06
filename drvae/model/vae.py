@@ -187,9 +187,9 @@ class ConvDRVAE(ConvVAE):
     def set_discrim_model(self, discrim_model, 
                           discrim_beta,
                           dim_out_to_use):
-        # assert that there are 0 trainalbe params in discrim model
-        assert(len(list(filter(lambda p: p.requires_grad, 
-                               discrim_model.parameters())))==0)
+        # # assert that there are 0 trainalbe params in discrim model
+        # assert(len(list(filter(lambda p: p.requires_grad, 
+        #                        discrim_model.parameters())))==0)
         self.discrim_model = [discrim_model]
         self.discrim_beta = discrim_beta
         self.dim_out_to_use = dim_out_to_use # chose dimension of the discrim output
@@ -213,8 +213,8 @@ class ConvDRVAE(ConvVAE):
 
         # push data and recond through discrim_model
         # ToDo - validate that this works.
-        zdiscrim_data  = self.discrim_model[0](data)[:, self.dim_out_to_use].clone()
-        zdiscrim_recon = self.discrim_model[0](recon_data)[:,  self.dim_out_to_use].clone()
+        zdiscrim_data  = self.discrim_model[0](data)[:, self.dim_out_to_use]
+        zdiscrim_recon = self.discrim_model[0](recon_data)[:,  self.dim_out_to_use]
         # squared error (ToDo: consider implementing binary KL)
         disc_loss = self.discrim_beta * \
             torch.sum((zdiscrim_data-zdiscrim_recon)**2)

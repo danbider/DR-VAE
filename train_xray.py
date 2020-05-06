@@ -111,9 +111,9 @@ else:
     print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
     discriminator = xrv.models.DenseNet(weights="all").cuda().eval()
-    # freeze discriminator weights.
-    for param in discriminator.parameters():
-            param.requires_grad = False
+    # # freeze discriminator weights.
+    # for param in discriminator.parameters():
+    #         param.requires_grad = False
     # define DRVAE model
     model = ConvDRVAE(arch_dict, 
                   scale_pixels = True,
