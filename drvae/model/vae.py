@@ -190,6 +190,7 @@ class ConvDRVAE(ConvVAE):
                 target, mu, logvar, 
                 scale_down_image_loss):
         
+        print(super(ConvDRVAE, self))
         # vae ELBO loss
         if scale_down_image_loss:
             # currently pixels in [-1024, 1024], 
@@ -201,7 +202,6 @@ class ConvDRVAE(ConvVAE):
             data, recon_data, target, mu, logvar)
 
         if self.discrim_beta == 0:
-            print('here at beta=0')
             return vae_loss
 
         # push data and recond through discrim_model
@@ -210,10 +210,7 @@ class ConvDRVAE(ConvVAE):
         zdiscrim_recon = self.discrim_model[0](recon_data)[:,  self.dim_out_to_use]
         # squared error (ToDo: consider implementing binary KL)
         disc_loss = self.discrim_beta * \
-            torch.sum((zdiscrim_data-zdiscrim_recon)**2) 
-        
-        print(vae_loss)
-        print(disc_loss)
+            torch.sum((zdiscrim_data-zdiscrim_recon)**2)
 
         assert ~np.isnan(vae_loss.clone().detach().cpu())
         assert ~np.isnan(disc_loss.clone().detach().cpu())
