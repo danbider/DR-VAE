@@ -210,6 +210,9 @@ class ConvDRVAE(ConvVAE):
         # squared error (ToDo: consider implementing binary KL)
         disc_loss = self.discrim_beta * \
             torch.sum((zdiscrim_data-zdiscrim_recon)**2) 
+        
+        print(vae_loss)
+        print(disc_loss)
 
         assert ~np.isnan(vae_loss.clone().detach().cpu())
         assert ~np.isnan(disc_loss.clone().detach().cpu())
