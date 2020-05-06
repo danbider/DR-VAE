@@ -75,6 +75,7 @@ class VAE(base.Model):
         # added contiguous() for running things on a CPU. 
         # https://github.com/agrimgupta92/sgan/issues/22
         # Note, currently target isn't used. Maybe kept for conditional VAE?
+        # can be negative, https://stats.stackexchange.com/questions/319859/can-log-likelihood-funcion-be-positive
         recon_ll = self.ll_fun(
             recon_data.contiguous().view(recon_data.shape[0], -1),
             data.contiguous().view(data.shape[0], -1))
@@ -212,8 +213,8 @@ class ConvDRVAE(ConvVAE):
 
         # push data and recond through discrim_model
         # ToDo - validate that this works.
-        zdiscrim_data  = self.discrim_model[0](data)[:, self.dim_out_to_use]
-        zdiscrim_recon = self.discrim_model[0](recon_data)[:,  self.dim_out_to_use]
+        zdiscrim_data  = self.discrim_model[0](data)[:, self.dim_out_to_use].clone()
+        zdiscrim_recon = self.discrim_model[0](recon_data)[:,  self.dim_out_to_use].clone()
         # squared error (ToDo: consider implementing binary KL)
         disc_loss = self.discrim_beta * \
             torch.sum((zdiscrim_data-zdiscrim_recon)**2)
@@ -506,7 +507,7 @@ class BeatMlpCondVAE(VAE):
 # Loss functions  #
 ###################
 def mse_loss(recon_x, x):
-    return torch.mean((recon_x - x) ** 2, dim=1)
+    return torch.sum((recon_x - x) ** 2, dim=1)
 
 def recon_loglike_function(recon_x, x, noise_var=.1*.1): # was .1
     num_obs_per_batch = x.shape[1]
