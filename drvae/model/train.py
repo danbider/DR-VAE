@@ -28,7 +28,7 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     batch_size    = kwargs.get("batch_size", 1024)
     epochs        = kwargs.get("epochs", 40)
     output_dir    = kwargs.get("output_dir", "./")
-    discrim_model = kwargs.get("discrim_model", None)
+    #discrim_model = kwargs.get("discrim_model", None)
     cond_dim      = kwargs.get("cond_dim", 1)
     zu_dropout_p  = kwargs.get("zu_dropout_p", .2)
     log_interval  = kwargs.get("log_interval", None)
@@ -38,6 +38,8 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     plot_interval      = kwargs.get("plot_interval", 10)
     dataset = kwargs.get("dataset", None)
     torch_seed = kwargs.get("torch_seed", None)
+    scale_down_image_loss = kwargs.get("scale_down_image_loss", 
+                                       False)
     #data_dim   = Xtrain.shape[1]
     print("-------------------")
     print("fitting vae: ", kwargs)
@@ -94,8 +96,11 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
                                             optimizer     = optimizer,
                                             do_cuda       = do_cuda,
                                             log_interval  = log_interval,
-                                            num_samples   = 1)
-        vloss, vrmse, vprecon = test_epoch_func(epoch, model, val_loader, do_cuda)
+                                            num_samples   = 1,
+                                            scale_down_image_loss=scale_down_image_loss)
+        vloss, vrmse, vprecon = test_epoch_func(epoch, model, 
+                                                val_loader, do_cuda, 
+                                                scale_down_image_loss=scale_down_image_loss)
         if epoch % epoch_log_interval == 0:
             print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
               epoch, "%2.4f"%tloss, "%2.4f"%vloss, 
@@ -223,7 +228,8 @@ def train_epoch_xraydata(epoch, model, train_loader,
                 optimizer     = None,
                 do_cuda       = True,
                 log_interval  = None,
-                num_samples   = 1):
+                num_samples   = 1,
+                scale_down_image_loss = False):
     '''This function is identical to train_epoch except that it uses 
     a map style dataset from torchxrayvision'''
     # set up train/eval mode
@@ -254,7 +260,9 @@ def train_epoch_xraydata(epoch, model, train_loader,
         for _ in range(num_samples):
             recon_batch, z, mu, logvar = model(data)
             # model computes its own loss
-            loss += model.lossfun(data, recon_batch, target, mu, logvar)
+            loss += model.lossfun(data, recon_batch, 
+                                  target, mu, logvar,
+                                  scale_down_image_loss)
             
             
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
@@ -293,8 +301,8 @@ def train_epoch_xraydata(epoch, model, train_loader,
 
         # if we have a discrim model, track how well it's reconstructing probs
         if hasattr(model, "discrim_model"):
-            zrec = model.discrim_model[0](recon_batch)
-            zdat = model.discrim_model[0](data)
+            zrec = model.discrim_model[0](recon_batch)[:, model.dim_out_to_use]
+            zdat = model.discrim_model[0](data)[:, model.dim_out_to_use]
             prec = torch.sigmoid(zrec)
             pdat = torch.sigmoid(zdat)
             recon_z_sse += torch.var(zrec-zdat).data.item()*data.shape[0]
@@ -312,9 +320,11 @@ def train_epoch_xraydata(epoch, model, train_loader,
     N = len(train_loader.dataset)
     return train_loss/N, recon_rmse/N, np.sqrt(recon_prob_sse/N)
 
-def test_epoch_xraydata(epoch, model, data_loader, do_cuda):
+def test_epoch_xraydata(epoch, model, data_loader, 
+                        do_cuda, scale_down_image_loss):
     return train_epoch_xraydata(epoch, model, train_loader=data_loader,
-                       optimizer=None, do_cuda=do_cuda)
+                       optimizer=None, do_cuda=do_cuda, 
+                       scale_down_image_loss=scale_down_image_loss)
 
 
 #def batch_reconstruct(mod, X):

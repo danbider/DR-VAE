@@ -55,21 +55,6 @@ class VAE(base.Model):
         self.fit_res = train.fit_vae(self, Xtrain, Xval, Xtest,
                                            Ytrain, Yval, Ytest, **kwargs)
         return self.fit_res
-    
-    # def fit(self, Xdata, Ydata, **kwargs):
-    #     '''can remove from here and change things in train.fit. 
-    #     dataset: a torchxrayvision.datasets.Dataset object'''
-    #     dataset = kwargs.get("dataset", None)
-    #     if dataset is not None: # torchxrayvision dataset
-    #           self.fit_res = train.fit_vae(self, None, None, None,
-    #                                            None, None, None, 
-    #                                            dataset=dataset, **kwargs)
-    #     else: # any other form of data
-    #            Xtrain, Xval, Xtest = Xdata
-    #            Ytrain, Yval, Ytest = Ydata
-    #            self.fit_res = train.fit_vae(self, Xtrain, Xval, Xtest,
-    #                                                Ytrain, Yval, Ytest, **kwargs)
-    #     return self.fit_res
 
     def reconstruction_error(self, X):
         dset = torch.utils.data.TensorDataset(
@@ -86,6 +71,7 @@ class VAE(base.Model):
     def lossfun(self, data, recon_data, target, mu, logvar):
         # added contiguous() for running things on a CPU. 
         # https://github.com/agrimgupta92/sgan/issues/22
+        # Note, currently target isn't used. Maybe kept for conditional VAE?
         recon_ll = self.ll_fun(
             recon_data.contiguous().view(recon_data.shape[0], -1),
             data.contiguous().view(data.shape[0], -1))
@@ -188,6 +174,48 @@ class ConvVAE(VAE):
 
         return x_bar, z, mu, lnvar
     
+class ConvDRVAE(ConvVAE):
+    """ adds a discriminative model and an associated penalty """
+    def set_discrim_model(self, discrim_model, 
+                          discrim_beta,
+                          dim_out_to_use):
+        # assert that there are 0 trainalbe params in discrim model
+        assert(len(list(filter(lambda p: p.requires_grad, 
+                               discrim_model.parameters())))==0)
+        self.discrim_model = [discrim_model]
+        self.discrim_beta = discrim_beta
+        self.dim_out_to_use = dim_out_to_use # chose dimension of the discrim output
+
+    def lossfun(self, data, recon_data, 
+                target, mu, logvar, 
+                scale_down_image_loss):
+        
+        # vae ELBO loss
+        if scale_down_image_loss:
+            # currently pixels in [-1024, 1024], 
+            # don't want it to dominate the equation
+            vae_loss = super(ConvDRVAE, self).lossfun(
+            data/1024.0, recon_data/1024.0, target, mu, logvar)
+        else:
+            vae_loss = super(ConvDRVAE, self).lossfun(
+            data, recon_data, target, mu, logvar)
+
+        if self.discrim_beta == 0:
+            return vae_loss
+
+        # push data and recond through discrim_model
+        # ToDo - validate that this works.
+        zdiscrim_data  = self.discrim_model[0](data)[:, self.dim_out_to_use]
+        zdiscrim_recon = self.discrim_model[0](recon_data)[:,  self.dim_out_to_use]
+        # squared error (ToDo: consider implementing binary KL)
+        disc_loss = self.discrim_beta * \
+            torch.sum((zdiscrim_data-zdiscrim_recon)**2) 
+
+        assert ~np.isnan(vae_loss.clone().detach().cpu())
+        assert ~np.isnan(disc_loss.clone().detach().cpu())
+        return vae_loss + disc_loss
+    
+
 
         
 # class BeatConvVAE(VAE):
@@ -365,7 +393,6 @@ class BeatMlpVAE(VAE):
             z = self.reparameterize(mu, logvar)
         return self.decode(z), z, mu, logvar
 
-
 class BeatMlpCycleVAE(BeatMlpVAE):
     """ Reconstructs a high-dimensional observation using an additional
     reconstruction penalty """
@@ -471,11 +498,7 @@ class BeatMlpCondVAE(VAE):
 ###################
 # Loss functions  #
 ###################
-# below a test
-# def recon_loglike_function(recon_x, x, noise_var=.1*.1):
-#     return torch.mean((recon_x - x) ** 2)
 
-# below the andy's original one.
 def recon_loglike_function(recon_x, x, noise_var=.1*.1):
     num_obs_per_batch = x.shape[1]
     ln_noise_var = np.log(noise_var)
@@ -575,7 +598,6 @@ class MvnVAE(VAE):
 
     def kl_q_to_prior():
         pass
-
 
 def decode_batch_list(mod, zmat, batch_size=256):
     data = torch.utils.data.TensorDataset(
