@@ -213,11 +213,12 @@ class ConvDRVAE(ConvVAE):
 
         # push data and recond through discrim_model
         # ToDo - validate that this works.
-        zdiscrim_data  = self.discrim_model[0](data)[:, self.dim_out_to_use]
-        zdiscrim_recon = self.discrim_model[0](recon_data)[:,  self.dim_out_to_use]
+        zdiscrim_data  = self.discrim_model[0](data)
+        zdiscrim_recon = self.discrim_model[0](recon_data)
         # squared error (ToDo: consider implementing binary KL)
         disc_loss = self.discrim_beta * \
-            torch.sum((zdiscrim_data-zdiscrim_recon)**2)
+            torch.sum((zdiscrim_data.clone()[:, self.dim_out_to_use]
+                       -zdiscrim_recon.clone()[:, self.dim_out_to_use])**2)
 
         assert ~np.isnan(vae_loss.clone().detach().cpu())
         assert ~np.isnan(disc_loss.clone().detach().cpu())
