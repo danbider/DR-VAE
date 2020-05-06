@@ -506,6 +506,9 @@ def recon_loglike_function(recon_x, x, noise_var=.1*.1):
     diff = x - recon_x
     ll   = -(.5/noise_var) * (diff*diff).sum(1) \
             -(.5*ln2pi + .5*ln_noise_var) * num_obs_per_batch
+    print(num_obs_per_batch)
+    print(diff**diff)
+    print(ll)
     return ll
 
 def binary_recon_loglike_function(recon_x, x):
