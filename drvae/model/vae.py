@@ -190,7 +190,8 @@ class ConvDRVAE(ConvVAE):
         # # assert that there are 0 trainalbe params in discrim model
         # assert(len(list(filter(lambda p: p.requires_grad, 
         #                        discrim_model.parameters())))==0)
-        self.discrim_model = [discrim_model]
+        #self.discrim_model = [discrim_model]
+        self.discrim_model = discrim_model
         self.discrim_beta = discrim_beta
         self.dim_out_to_use = dim_out_to_use # chose dimension of the discrim output
 
@@ -205,6 +206,7 @@ class ConvDRVAE(ConvVAE):
             vae_loss = super(ConvDRVAE, self).lossfun(
             data.clone()/1024.0, recon_data.clone()/1024.0, target, mu, logvar)
         else:
+            print('i am here, no scaling down.')
             vae_loss = super(ConvDRVAE, self).lossfun(
             data, recon_data, target, mu, logvar)
 
@@ -213,8 +215,11 @@ class ConvDRVAE(ConvVAE):
 
         # push data and recond through discrim_model
         # ToDo - validate that this works.
-        zdiscrim_data  = self.discrim_model[0](data)#[:, self.dim_out_to_use]
-        zdiscrim_recon = self.discrim_model[0](recon_data)#[:, self.dim_out_to_use]
+        #zdiscrim_data  = self.discrim_model[0](data)#[:, self.dim_out_to_use]
+        #zdiscrim_recon = self.discrim_model[0](recon_data)#[:, self.dim_out_to_use]
+        zdiscrim_data  = self.discrim_model(data)#[:, self.dim_out_to_use]
+        zdiscrim_recon = self.discrim_model(recon_data)#[:, self.dim_out_to_use]
+
         print(zdiscrim_data.shape)
         print(zdiscrim_recon.shape)
         # zdiscrim_data  = self.discrim_model[0](
