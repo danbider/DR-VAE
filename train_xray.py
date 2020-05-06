@@ -38,6 +38,8 @@ parser.add_argument('--log_interval', type=int, default=None, help='')
 parser.add_argument('--ignore_warnings', action="store_true")
 parser.add_argument('--scale_down_image_loss', action="store_true")
 parser.add_argument('--vae_only', action="store_true")
+parser.add_argument("--recon_like_function", default='gaussian', help='image_loss')
+
 
 args, _ = parser.parse_known_args()
 
@@ -103,7 +105,8 @@ arch_dict['clamp_minmax'] = [-1.0,1.0]
 if args.vae_only == True: # if just vae
     print('fitting just VAE.')
     model = ConvVAE(arch_dict, 
-              scale_pixels = True)
+              scale_pixels = True,
+              loglike_function = args.recon_like_function)
 else:
     print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
@@ -113,7 +116,8 @@ else:
             param.requires_grad = False
     # define DRVAE model
     model = ConvDRVAE(arch_dict, 
-                  scale_pixels = True)
+                  scale_pixels = True,
+                  loglike_function = args.recon_like_function)
     model.set_discrim_model(discriminator, 
                             discrim_beta = args.beta,
                             dim_out_to_use=8)
@@ -136,7 +140,7 @@ rundict = model.fit([None, None, None],
         output_dir = "vae-xray", # ToDo adapt
         torch_seed= int(0),
         batch_size=args.batch_size,
-        scale_down_image_loss = args.scale_down_image_loss,
+        scale_down_image_loss = args.scale_down_image_loss
         )
 
 resdict['model'] = model
