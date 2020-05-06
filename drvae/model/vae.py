@@ -190,7 +190,6 @@ class ConvDRVAE(ConvVAE):
                 target, mu, logvar, 
                 scale_down_image_loss):
         
-        print(super(ConvDRVAE, self))
         # vae ELBO loss
         if scale_down_image_loss:
             # currently pixels in [-1024, 1024], 
@@ -507,6 +506,11 @@ def recon_loglike_function(recon_x, x, noise_var=.1*.1):
     ll   = -(.5/noise_var) * (diff*diff).sum(1) \
             -(.5*ln2pi + .5*ln_noise_var) * num_obs_per_batch
     print(num_obs_per_batch)
+    print('x')
+    print(x)
+    print('recon_x')
+    print(recon_x)
+    print('diff_squared')
     print(diff**diff)
     print(ll)
     return ll
