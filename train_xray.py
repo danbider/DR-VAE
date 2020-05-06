@@ -117,7 +117,7 @@ else:
     discriminator = nn.Sequential(nn.Linear(args.image_size*args.image_size, 
                                             num_mlp_hidden),
                              nn.Tanh(),
-                              nn.Linear(num_mlp_hidden, 1))
+                              nn.Linear(num_mlp_hidden, 1)).cuda()
     # # freeze discriminator weights.
     # for param in discriminator.parameters():
     #         param.requires_grad = False
