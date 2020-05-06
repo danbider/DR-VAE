@@ -8,6 +8,8 @@ Train a DR-VAE, or just a VAE, on chest x-ray data.
 When I want to test multiple betas, take a look at synthetic_experiment.py
 """
 import torch
+from torch import nn
+
 #print(torch.__version__)
 import torchvision
 #print(torchvision.__version__)
@@ -110,7 +112,12 @@ if args.vae_only == True: # if just vae
 else:
     print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
-    discriminator = xrv.models.DenseNet(weights="all").cuda()#.eval()
+    #discriminator = xrv.models.DenseNet(weights="all").cuda()#.eval()
+    num_mlp_hidden = 3
+    discriminator = nn.Sequential(nn.Linear(args.image_size*args.image_size, 
+                                            num_mlp_hidden),
+                             nn.Tanh(),
+                              nn.Linear(num_mlp_hidden, 1))
     # # freeze discriminator weights.
     # for param in discriminator.parameters():
     #         param.requires_grad = False
