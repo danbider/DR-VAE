@@ -37,6 +37,8 @@ parser.add_argument('--dataset_size', type=int, default=None, help='')
 parser.add_argument('--log_interval', type=int, default=None, help='')
 parser.add_argument('--ignore_warnings', action="store_true")
 parser.add_argument('--scale_down_image_loss', action="store_true")
+parser.add_argument('--vae_only', action="store_true")
+
 args, _ = parser.parse_known_args()
 
 # ToDo -- add a condition where it's just vanilla vae.? or probably not necessary if beta
@@ -99,9 +101,11 @@ arch_dict['ae_decoding_final_nonlin'] = 'clamp' # [str] 'linear' | 'sigmoid', if
 arch_dict['clamp_minmax'] = [-1.0,1.0]
 
 if args.vae_only == True: # if just vae
+    print('fitting just VAE.')
     model = ConvVAE(arch_dict, 
               scale_pixels = True)
 else:
+    print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
     discriminator = xrv.models.DenseNet(weights="all").cuda().eval()
     # freeze discriminator weights.
