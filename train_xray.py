@@ -110,7 +110,7 @@ if args.vae_only == True: # if just vae
 else:
     print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
-    discriminator = xrv.models.DenseNet(weights="all").cuda().eval()
+    discriminator = xrv.models.DenseNet(weights="all").cuda()#.eval()
     # # freeze discriminator weights.
     # for param in discriminator.parameters():
     #         param.requires_grad = False
