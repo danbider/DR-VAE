@@ -243,7 +243,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
     train_loss = 0
     recon_rmse = 0.
     recon_prob_sse, recon_z_sse = 0., 0.
-    loss_list = []
+    loss_list = [] # renewed every epoch for debugging
     #trues, preds = [], []
     #t = tqdm(train_loader) # and also had t instead of train loader inside brackets.
     for batch_idx, samples in enumerate(train_loader):
@@ -265,19 +265,24 @@ def train_epoch_xraydata(epoch, model, train_loader,
                                   target, mu, logvar,
                                   scale_down_image_loss)            
             
-            loss_list.append(loss.detach().numpy())
+            loss_list.append(loss.detach().cpu().numpy())
             
             # tests
             unique_elem, unique_counts = data.view(
                             data.shape[0],-1).unique(
                                 dim=0, return_counts=True)
+            
             if (unique_counts<2).any():
                 print(unique_counts)
                 print(unique_elem)
                 print(data)
+            
+            if batch_idx>2:
+                if np.abs(loss_list[-1]/loss_list[-2]) > 100.00:
+                    print(data)
 
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
-                (data.view(data.shape[0],-1).sum(dim=1).detach().numpy() == 0).any() or \
+                (data.view(data.shape[0],-1).sum(dim=1).detach().cpu().numpy() == 0).any() or \
                 np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())) !=0 or \
                 np.sum(np.isnan(mu.detach().cpu().numpy().flatten())) !=0 or \
                 np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())) !=0:
