@@ -264,6 +264,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
             loss += model.lossfun(data, recon_batch, 
                                   target, mu, logvar,
                                   scale_down_image_loss)
+            print(type(loss))
             
             
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
