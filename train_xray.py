@@ -54,16 +54,16 @@ class XRayResizer(object):
 
     def __call__(self, img):
         '''img: [None, img.shape[0], img.shape[1]] array'''
-        with warnings.catch_warnings():
-            warnings.simplefilter("default")
-            img = img[0,:,:]
-            resized = cv2.resize(img, (self.size, self.size), 
-                         interpolation = cv2.INTER_AREA).reshape(
-                                1,self.size,self.size).astype(
-                                    np.float32)
-            if len(np.unique(resized)) < 2:
-                print('warning: all pixel values are the same.')
-            return resized
+        #with warnings.catch_warnings():
+        #   warnings.simplefilter("default")
+        img = img[0,:,:]
+        resized = cv2.resize(img, (self.size, self.size), 
+                     interpolation = cv2.INTER_AREA).reshape(
+                            1,self.size,self.size).astype(
+                                np.float32)
+        if len(np.unique(resized)) < 2:
+            sys.exit('dataloader warning: all pixel values are the same.')
+        return resized
 
 output_dir = os.path.join("./vae-xray", args.training_outcome)
 if not os.path.exists(output_dir):
