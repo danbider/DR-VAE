@@ -216,8 +216,6 @@ class ConvDRVAE(ConvVAE):
         # ToDo - validate that this works.
         zdiscrim_data  = self.discrim_model[0](data)[:, self.dim_out_to_use]
         zdiscrim_recon = self.discrim_model[0](recon_data)[:, self.dim_out_to_use]
-        print(zdiscrim_data)
-        print(zdiscrim_recon)
 
         #zdiscrim_data  = self.discrim_model(data)#[:, self.dim_out_to_use]
         #zdiscrim_recon = self.discrim_model(recon_data)#[:, self.dim_out_to_use]
@@ -230,7 +228,6 @@ class ConvDRVAE(ConvVAE):
         disc_loss = self.discrim_beta * \
             torch.sum((zdiscrim_data
                        -zdiscrim_recon)**2)
-        print(disc_loss)
         assert ~np.isnan(vae_loss.clone().detach().cpu())
         assert ~np.isnan(disc_loss.clone().detach().cpu())
         return vae_loss + disc_loss
