@@ -21,7 +21,6 @@ torch.autograd.set_detect_anomaly(True)
 import numpy as np
 ln2pi = np.log(2*np.pi)
 
-
 def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     # args
     #kwargs = {}
@@ -244,6 +243,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
     train_loss = 0
     recon_rmse = 0.
     recon_prob_sse, recon_z_sse = 0., 0.
+    loss_list = []
     #trues, preds = [], []
     #t = tqdm(train_loader) # and also had t instead of train loader inside brackets.
     for batch_idx, samples in enumerate(train_loader):
@@ -265,10 +265,22 @@ def train_epoch_xraydata(epoch, model, train_loader,
                                   target, mu, logvar,
                                   scale_down_image_loss)            
             
+            loss_list.append(loss.detach().numpy())
+            
+            # tests
+            unique_elem, unique_counts = data.view(
+                            data.shape[0],-1).unique(
+                                dim=0, return_counts=True)
+            if (unique_counts<2).any():
+                print(unique_counts)
+                print(unique_elem)
+                print(data)
+
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
+                (data.view(data.shape[0],-1).sum(dim=1).detach().numpy() == 0).any() or \
                 np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())) !=0 or \
                 np.sum(np.isnan(mu.detach().cpu().numpy().flatten())) !=0 or \
-                np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())) !=0: \
+                np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())) !=0:
                 
                 print('data is nan:')
                 print(np.sum(np.isnan(data.detach().cpu().numpy().flatten())))
