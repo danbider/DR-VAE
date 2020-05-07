@@ -276,7 +276,9 @@ def train_epoch_xraydata(epoch, model, train_loader,
                 'We have a problem with unique counts.'
                 print(unique_counts)
                 print(unique_elem)
-                print(data)
+                for i in range(data.shape[0]):
+                    print('image %s' %str(i))
+                    print(data[i,0,:,:].flatten().unique())
                 sys.exit('exiting due to unique counts problem')
             
             if batch_idx>2:
