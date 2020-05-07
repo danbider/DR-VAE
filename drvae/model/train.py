@@ -273,9 +273,11 @@ def train_epoch_xraydata(epoch, model, train_loader,
                                 dim=0, return_counts=True)
             
             if (unique_counts<2).any():
+                'We have a problem with unique counts.'
                 print(unique_counts)
                 print(unique_elem)
                 print(data)
+                sys.exit('exiting due to unique counts problem')
             
             if batch_idx>2:
                 if np.abs(loss_list[-1]/loss_list[-2]) > 100.00:
