@@ -272,18 +272,15 @@ def train_epoch_xraydata(epoch, model, train_loader,
                             data.shape[0],-1).unique(
                                 dim=0, return_counts=True)
             
-            if (unique_counts<2).any():
-                'We have a problem with unique counts.'
-                print(unique_counts)
-                print(unique_elem)
-                for i in range(data.shape[0]):
-                    print('image %s' %str(i))
-                    print(data[i,0,:,:].flatten().unique())
-                sys.exit('exiting due to unique counts problem')
+
+            for i in range(data.shape[0]):
+                print('image %s' %str(i))
+                print(data[i,0,:,:].flatten().unique())
             
             if batch_idx>2:
                 if np.abs(loss_list[-1]/loss_list[-2]) > 100.00:
-                    print(data)
+                    print('loss just jumped!')
+                    #print(data)
 
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
                 (data.view(data.shape[0],-1).sum(dim=1).detach().cpu().numpy() == 0).any() or \
