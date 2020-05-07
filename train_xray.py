@@ -113,7 +113,7 @@ else:
     print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
     discriminator = xrv.models.DenseNet(weights="all").cuda().eval()
-    discriminator.op_threshs = None
+    #discriminator.op_threshs = None
     # num_mlp_hidden = 3
     # discriminator = nn.Sequential(nn.Linear(args.image_size*args.image_size, 
     #                                         num_mlp_hidden),

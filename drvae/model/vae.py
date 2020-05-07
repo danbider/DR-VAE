@@ -206,7 +206,6 @@ class ConvDRVAE(ConvVAE):
             vae_loss = super(ConvDRVAE, self).lossfun(
             data/1024.0, recon_data/1024.0, target, mu, logvar)
         else:
-            print('i am here, no scaling down.')
             vae_loss = super(ConvDRVAE, self).lossfun(
             data, recon_data, target, mu, logvar)
 
