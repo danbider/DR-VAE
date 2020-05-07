@@ -274,13 +274,18 @@ def train_epoch_xraydata(epoch, model, train_loader,
             
 
             for i in range(data.shape[0]):
-                print('image %s' %str(i))
-                print(data[i,0,:,:].flatten().unique())
+                if(len(data[i,0,:,:].flatten().unique())<2):
+                    print('image %s' %str(i))
+                    print(data[i,0,:,:].flatten().unique())
+
             
             if batch_idx>2:
                 if np.abs(loss_list[-1]/loss_list[-2]) > 100.00:
                     print('loss just jumped!')
-                    #print(data)
+                    for i in range(data.shape[0]):
+                        print('image %s' %str(i))
+                        print(data[i,0,:,:].flatten().unique())
+                        #print(data)
 
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
                 (data.view(data.shape[0],-1).sum(dim=1).detach().cpu().numpy() == 0).any() or \
