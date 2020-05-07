@@ -279,7 +279,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
                     print(data[i,0,:,:].flatten().unique())
 
             
-            if batch_idx>2:
+            if batch_idx>1:
                 if np.abs(loss_list[-1]/loss_list[-2]) > 100.00:
                     print('loss just jumped!')
                     for i in range(data.shape[0]):
