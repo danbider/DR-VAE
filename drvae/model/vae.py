@@ -204,7 +204,7 @@ class ConvDRVAE(ConvVAE):
             # currently pixels in [-1024, 1024], 
             # don't want it to dominate the equation
             vae_loss = super(ConvDRVAE, self).lossfun(
-            data.clone()/1024.0, recon_data.clone()/1024.0, target, mu, logvar)
+            data/1024.0, recon_data/1024.0, target, mu, logvar)
         else:
             print('i am here, no scaling down.')
             vae_loss = super(ConvDRVAE, self).lossfun(
