@@ -44,7 +44,6 @@ parser.add_argument("--recon_like_function", default='gaussian', help='image_los
 
 
 args, _ = parser.parse_known_args()
-print(args.scale_down_image_loss)
 # ToDo -- add a condition where it's just vanilla vae.? or probably not necessary if beta
 # defaults to zero. add the torch xrv model, inspect the outputs and make sure
 # it's fine.
@@ -147,6 +146,8 @@ rundict = model.fit([None, None, None],
         )
 
 resdict['model'] = model
+resdict['discrim_beta'] = args.beta
+resdict['num_latents'] = args.num_latents
 
 
 # # for inspiration, delete later.
