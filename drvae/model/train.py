@@ -263,9 +263,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
             # model computes its own loss
             loss += model.lossfun(data, recon_batch, 
                                   target, mu, logvar,
-                                  scale_down_image_loss)
-            print(type(loss))
-            
+                                  scale_down_image_loss)            
             
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
                 np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())) !=0 or \
@@ -305,6 +303,8 @@ def train_epoch_xraydata(epoch, model, train_loader,
         if hasattr(model, "discrim_model"):
             zrec = model.discrim_model[0](recon_batch)[:, model.dim_out_to_use]
             zdat = model.discrim_model[0](data)[:, model.dim_out_to_use]
+            print(zrec.device)
+            print(zdat.device)
             prec = torch.sigmoid(zrec)
             pdat = torch.sigmoid(zdat)
             recon_z_sse += torch.var(zrec-zdat).data.item()*data.shape[0]
