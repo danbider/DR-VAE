@@ -610,7 +610,7 @@ def plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100):
     axarr[2].hist(z.detach().cpu().numpy().flatten(), bins=100, density = True);
     axarr[2].set_title('z [%.2f, %.2f]' % (np.min(z_np), np.max(z_np)));
     f.suptitle('Epoch %i, Batch %i stats' %(epoch, batch_idx))
-    f.tight_layout()
+    #f.tight_layout()
     plt.savefig('epoch_%i_batch_%i_latent_stats.png' % (epoch, batch_idx))
     plt.close("all")
     
