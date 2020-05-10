@@ -323,9 +323,9 @@ def train_epoch_xraydata(epoch, model, train_loader,
                     loss_list.append(loss[0].data.item()) # loss list within a an epoch.
                     latent_loss_list.append(loss[2].data.item())
                     if batch_idx>1:
-                        if np.abs(loss_list[-1]/loss_list[-2]) > 100.00 or \
-                            np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 100.00:
-                            print('------loss just jumped!---------')
+                        if np.abs(loss_list[-1]/loss_list[-2]) > 1000.00 or \
+                            np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 1000.00:
+                            print('------batch loss just jumped!---------')
                             plot_recon_batch(recon_batch, data, epoch, batch_idx)
                             plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100)
                             torch.save(recon_batch, 'prob_recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
@@ -605,16 +605,15 @@ def plot_beat(data, recon_x=None):
     return fig, axarr
 
 def plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100):
-    f, axarr = plt.subplots(1,3, figsize = (12,4))
     mu_np = mu.detach().cpu().numpy().flatten()
     logvar_np = logvar.detach().cpu().numpy().flatten()
     z_np = z.detach().cpu().numpy().flatten()
-
+    f, axarr = plt.subplots(1,3, figsize = (12,4))
     axarr[0].hist(mu_np, bins=100, density = True);
     axarr[0].set_title('mu [%.2f, %.2f]' % (np.min(mu_np), np.max(mu_np)));
-    axarr[1].hist(logvar.detach().cpu().numpy().flatten(), bins=100, density = True);
+    axarr[1].hist(logvar_np, bins=100, density = True);
     axarr[1].set_title('logvar [%.2f, %.2f]' % (np.min(logvar_np), np.max(logvar_np)));
-    axarr[2].hist(z.detach().cpu().numpy().flatten(), bins=100, density = True);
+    axarr[2].hist(z_np, bins=100, density = True);
     axarr[2].set_title('z [%.2f, %.2f]' % (np.min(z_np), np.max(z_np)));
     f.suptitle('Epoch %i, Batch %i stats' %(epoch, batch_idx))
     #f.tight_layout()

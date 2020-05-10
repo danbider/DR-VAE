@@ -43,6 +43,8 @@ parser.add_argument('--vae_only', action="store_true")
 parser.add_argument("--recon_like_function", default='gaussian', help='image_loss')
 parser.add_argument('--num_zero_kl_epochs', type=int, default=20, help='')
 parser.add_argument('--anneal_rate', type=float, default= 0.005, help='')
+parser.add_argument('--epoch_log_interval', type=int, default= 10, help='')
+
 # ToDo: maybe add du cuda?
 
 args, _ = parser.parse_known_args()
@@ -146,7 +148,7 @@ rundict = model.fit([None, None, None],
         dataset = dataset, # note the dataset input.
         epochs = args.num_epochs,
         log_interval = args.log_interval,
-        epoch_log_interval = 10,
+        epoch_log_interval = args.epoch_log_interval,
         plot_interval = 10,
         output_dir = "vae-xray", # ToDo adapt
         torch_seed= int(0),
