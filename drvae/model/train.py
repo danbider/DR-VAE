@@ -304,7 +304,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
             #           kl_beta,
             #           scale_down_image_loss) 
             
-            loss_list.append(loss[0].detach().cpu().numpy()) # loss list within a batch.
+            loss_list.append(loss[0].detach().cpu().numpy()) # loss list within a an epoch.
             
             # tests 
             # for i in range(data.shape[0]):
@@ -328,6 +328,11 @@ def train_epoch_xraydata(epoch, model, train_loader,
                         print(len(recon_batch[i,0,:,:].flatten().unique()))
                         print('mu %s' % str(i))
                         print(mu[i,:].flatten())
+                    
+                    torch.save(recon_batch, 'recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                    torch.save(data, 'recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                    torch.save(mu, 'mu_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                    torch.save(logvar, 'logvar_epoch%i_batch_%i.pt' %(epoch, batch_idx))
 
                         #print(data)
 

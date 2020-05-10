@@ -116,8 +116,11 @@ class ConvAEEncoder(nn.Module):
         self.FF = nn.Linear(last_conv_size, self.hparams['n_ae_latents'])
 
         # If VAE model, have additional ff layer to latent variances
+        # ToDo -- add as a condition, maybe using my clamp function.
         if self.hparams['model_class'] == 'vae':
-            self.logvar = nn.Linear(last_conv_size, self.hparams['n_ae_latents'])
+            self.logvar = torch.clamp(nn.Linear(last_conv_size, 
+                                                self.hparams['n_ae_latents']),
+                                      min= -4.0, max = 4.0)
         elif self.hparams['model_class'] == 'ae':
             pass
         else:
