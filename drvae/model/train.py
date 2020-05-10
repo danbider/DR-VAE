@@ -612,6 +612,7 @@ def plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100):
     f.suptitle('Epoch %i, Batch %i stats' %(epoch, batch_idx))
     f.tight_layout()
     plt.savefig('epoch_%i_batch_%i_latent_stats.png' % (epoch, batch_idx))
+    plt.close("all")
     
 def plot_recon_batch(recon, data, epoch, batch_idx):
     """"wrapper around plot_images."""
@@ -631,5 +632,6 @@ def plot_recon_batch(recon, data, epoch, batch_idx):
     f.suptitle('recons: epoch %i batch %i' % (epoch, batch_idx), fontsize = 28)
     f.tight_layout()
     plt.savefig('epoch_%i_batch_%i_recon_stats.png' % (epoch, batch_idx))
+    plt.close("all")
 
                 
