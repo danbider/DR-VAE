@@ -305,8 +305,6 @@ def train_epoch_xraydata(epoch, model, train_loader,
             #           kl_beta,
             #           scale_down_image_loss) 
             
-            loss_list.append(loss[0].detach().cpu().numpy()) # loss list within a an epoch.
-            latent_loss_list.append(loss[2].detach().cpu().numpy())
             # tests 
             # for i in range(data.shape[0]):
             #     if(len(data[i,0,:,:].flatten().unique())<2):
@@ -315,60 +313,62 @@ def train_epoch_xraydata(epoch, model, train_loader,
             #     if(len(recon_batch[i,0,:,:].flatten().unique())<2):
             #         print('recon image %s' %str(i))
             #         print(recon_batch[i,0,:,:].flatten().unique())
-
-            with torch.no_grad():
-                if batch_idx>1:
-                    if np.abs(loss_list[-1]/loss_list[-2]) > 100.00 or \
-                        np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 100.00:
-                        print('------loss just jumped!---------')
-                        plot_recon_batch(recon_batch, data, epoch, batch_idx)
-                        plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100)
-                        torch.save(recon_batch, 'prob_recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                        torch.save(data, 'prob_data_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                        torch.save(mu, 'prob_mu_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                        torch.save(logvar, 'prob_logvar_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                        print('tensors, reconstructions and latent stats saved in %s' % \
-                              os.getcwd())
-    
-                        # for i in range(data.shape[0]):
-                        #     print('data image %s' %str(i))
-                        #     print(data[i,0,:,:].flatten().unique())
-                        #     print(len(data[i,0,:,:].flatten().unique()))
-                        #     print('recon image %s' %str(i))
-                        #     print(recon_batch[i,0,:,:].flatten().unique())
-                        #     print(len(recon_batch[i,0,:,:].flatten().unique()))
-                        #     print('mu %s' % str(i))
-                        #     print(mu[i,:].flatten())
-                        # plot and save
-                       
-                            #print(data)
-    
-                if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
-                    (data.view(data.shape[0],-1).sum(dim=1).detach().cpu().numpy() == 0).any() or \
-                    np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())) !=0 or \
-                    np.sum(np.isnan(mu.detach().cpu().numpy().flatten())) !=0 or \
-                    np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())) !=0:
-                    
-                    print('data is nan:')
-                    print(np.sum(np.isnan(data.detach().cpu().numpy().flatten())))
-                    print(np.min(data.detach().cpu().numpy().flatten()))
-                    print(np.max(data.detach().cpu().numpy().flatten()))
-                    print('data raw:')
-                    print(data)
-                    print('recon is nan:')
-                    print(np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())))
-                    print(np.min(recon_batch.detach().cpu().numpy().flatten()))
-                    print(np.max(recon_batch.detach().cpu().numpy().flatten()))
-                    print('mu is nan:')
-                    print(np.sum(np.isnan(mu.detach().cpu().numpy().flatten())))
-                    print(mu.detach().cpu().numpy().flatten())
-                    print(np.min(mu.detach().cpu().numpy().flatten()))
-                    print(np.max(mu.detach().cpu().numpy().flatten()))
-                    print('lnvar is nan:')
-                    print(np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())))
-                    print(logvar.detach().cpu().numpy().flatten())
-                    print(np.min(logvar.detach().cpu().numpy().flatten()))
-                    print(np.max(logvar.detach().cpu().numpy().flatten()))
+            if do_train:
+                with torch.no_grad():
+                    loss_list.append(loss[0].item()) # loss list within a an epoch.
+                    latent_loss_list.append(loss[2].item())
+                    if batch_idx>1:
+                        if np.abs(loss_list[-1]/loss_list[-2]) > 100.00 or \
+                            np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 100.00:
+                            print('------loss just jumped!---------')
+                            plot_recon_batch(recon_batch, data, epoch, batch_idx)
+                            plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100)
+                            torch.save(recon_batch, 'prob_recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                            torch.save(data, 'prob_data_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                            torch.save(mu, 'prob_mu_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                            torch.save(logvar, 'prob_logvar_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                            print('tensors, reconstructions and latent stats saved in %s' % \
+                                  os.getcwd())
+        
+                            # for i in range(data.shape[0]):
+                            #     print('data image %s' %str(i))
+                            #     print(data[i,0,:,:].flatten().unique())
+                            #     print(len(data[i,0,:,:].flatten().unique()))
+                            #     print('recon image %s' %str(i))
+                            #     print(recon_batch[i,0,:,:].flatten().unique())
+                            #     print(len(recon_batch[i,0,:,:].flatten().unique()))
+                            #     print('mu %s' % str(i))
+                            #     print(mu[i,:].flatten())
+                            # plot and save
+                           
+                                #print(data)
+        
+                    if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
+                        (data.view(data.shape[0],-1).sum(dim=1).detach().cpu().numpy() == 0).any() or \
+                        np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())) !=0 or \
+                        np.sum(np.isnan(mu.detach().cpu().numpy().flatten())) !=0 or \
+                        np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())) !=0:
+                        
+                        print('data is nan:')
+                        print(np.sum(np.isnan(data.detach().cpu().numpy().flatten())))
+                        print(np.min(data.detach().cpu().numpy().flatten()))
+                        print(np.max(data.detach().cpu().numpy().flatten()))
+                        print('data raw:')
+                        print(data)
+                        print('recon is nan:')
+                        print(np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())))
+                        print(np.min(recon_batch.detach().cpu().numpy().flatten()))
+                        print(np.max(recon_batch.detach().cpu().numpy().flatten()))
+                        print('mu is nan:')
+                        print(np.sum(np.isnan(mu.detach().cpu().numpy().flatten())))
+                        print(mu.detach().cpu().numpy().flatten())
+                        print(np.min(mu.detach().cpu().numpy().flatten()))
+                        print(np.max(mu.detach().cpu().numpy().flatten()))
+                        print('lnvar is nan:')
+                        print(np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())))
+                        print(logvar.detach().cpu().numpy().flatten())
+                        print(np.min(logvar.detach().cpu().numpy().flatten()))
+                        print(np.max(logvar.detach().cpu().numpy().flatten()))
 
 
         if do_train:
