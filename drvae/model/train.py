@@ -272,6 +272,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
     discrim_loss = 0.
     recon_prob_sse, recon_z_sse = 0., 0.
     loss_list = [] # renewed every epoch for debugging
+    latent_loss_list = []
     #trues, preds = [], []
     #t = tqdm(train_loader) # and also had t instead of train loader inside brackets.
     for batch_idx, samples in enumerate(train_loader):
@@ -305,7 +306,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
             #           scale_down_image_loss) 
             
             loss_list.append(loss[0].detach().cpu().numpy()) # loss list within a an epoch.
-            
+            latent_loss_list.append(loss[2].detach().cpu().numpy())
             # tests 
             # for i in range(data.shape[0]):
             #     if(len(data[i,0,:,:].flatten().unique())<2):
@@ -317,23 +318,29 @@ def train_epoch_xraydata(epoch, model, train_loader,
 
             
             if batch_idx>1:
-                if np.abs(loss_list[-1]/loss_list[-2]) > 100.00:
+                if np.abs(loss_list[-1]/loss_list[-2]) > 100.00 or \
+                    np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 100.00:
                     print('------loss just jumped!---------')
-                    for i in range(data.shape[0]):
-                        print('data image %s' %str(i))
-                        print(data[i,0,:,:].flatten().unique())
-                        print(len(data[i,0,:,:].flatten().unique()))
-                        print('recon image %s' %str(i))
-                        print(recon_batch[i,0,:,:].flatten().unique())
-                        print(len(recon_batch[i,0,:,:].flatten().unique()))
-                        print('mu %s' % str(i))
-                        print(mu[i,:].flatten())
-                    
-                    torch.save(recon_batch, 'recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                    torch.save(data, 'recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                    torch.save(mu, 'mu_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                    torch.save(logvar, 'logvar_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                    plot_recon_batch(recon_batch, data, epoch, batch_idx)
+                    plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100)
+                    torch.save(recon_batch, 'prob_recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                    torch.save(data, 'prob_data_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                    torch.save(mu, 'prob_mu_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                    torch.save(logvar, 'prob_logvar_epoch%i_batch_%i.pt' %(epoch, batch_idx))
+                    print('tensors, reconstructions and latent stats saved in %s' % \
+                          os.getcwd())
 
+                    # for i in range(data.shape[0]):
+                    #     print('data image %s' %str(i))
+                    #     print(data[i,0,:,:].flatten().unique())
+                    #     print(len(data[i,0,:,:].flatten().unique()))
+                    #     print('recon image %s' %str(i))
+                    #     print(recon_batch[i,0,:,:].flatten().unique())
+                    #     print(len(recon_batch[i,0,:,:].flatten().unique()))
+                    #     print('mu %s' % str(i))
+                    #     print(mu[i,:].flatten())
+                    # plot and save
+                   
                         #print(data)
 
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
@@ -365,9 +372,13 @@ def train_epoch_xraydata(epoch, model, train_loader,
 
 
         if do_train:
-            # save last batch of data in case it crashes
-            torch.save(recon_batch, 'recon_batch.pt')
-            torch.save(data, 'data_batch.pt')
+            # save last batch of data in case it crashes. can remove when runs smoothly.
+            torch.save(recon_batch, 'recon_batch.pt' %(epoch, batch_idx))
+            torch.save(data, 'recon_batch.pt' %(epoch, batch_idx))
+            torch.save(mu, 'mu_batch.pt' %(epoch, batch_idx))
+            torch.save(logvar, 'logvar_batch.pt' %(epoch, batch_idx))
+            torch.save(logvar, 'z_batch.pt' %(epoch, batch_idx))
+
             # minimize first element in the loss tuple.
             loss[0].backward() 
             optimizer.step()
@@ -585,5 +596,40 @@ def plot_beat(data, recon_x=None):
             ax.plot(recon_x[i, 0, :].data.numpy(), label="recon")
         ax.legend()
     return fig, axarr
+
+def plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100):
+    f, axarr = plt.subplots(1,3, figsize = (12,4))
+    mu_np = mu.detach().cpu().numpy().flatten()
+    logvar_np = logvar.detach().cpu().numpy().flatten()
+    z_np = z.detach().cpu().numpy().flatten()
+
+    axarr[0].hist(mu_np, bins=100, density = True);
+    axarr[0].set_title('mu [%.2f, %.2f]' % (np.min(mu_np), np.max(mu_np)));
+    axarr[1].hist(logvar.detach().cpu().numpy().flatten(), bins=100, density = True);
+    axarr[1].set_title('logvar [%.2f, %.2f]' % (np.min(logvar_np), np.max(logvar_np)));
+    axarr[2].hist(z.detach().cpu().numpy().flatten(), bins=100, density = True);
+    axarr[2].set_title('z [%.2f, %.2f]' % (np.min(z_np), np.max(z_np)));
+    f.suptitle('Epoch %i, Batch %i stats' %(epoch, batch_idx))
+    f.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig('epoch_%i_batch_%i_latent_stats.png' % (epoch, batch_idx))
+    
+def plot_recon_batch(recon, data, epoch, batch_idx):
+    """"wrapper around plot_images."""
+    recon = recon.detach().cpu().numpy()
+    data = data.detach().cpu().numpy()
+    batch_size = data.shape[0]
+    image_size = data.shape[-1] # squared images.
+    f, axarr = plt.subplots(1,2, figsize = (20,17))
+    axarr[0].set_title('recon.',  fontsize = 24)
+    axarr[1].set_title('data',  fontsize = 24)
+    plot_images(recon.squeeze(1).reshape(batch_size,-1), axarr[0], ims_per_row=5, 
+                padding=5, digit_dimensions=(image_size, image_size),
+                cmap='gray', vmin=None, vmax=None)
+    plot_images(data.squeeze(1).reshape(batch_size,-1), axarr[1], ims_per_row=5, 
+                padding=5, digit_dimensions=(image_size, image_size),
+                cmap='gray', vmin=None, vmax=None)
+    f.suptitle('recons: epoch %i batch %i' % (epoch, batch_idx), fontsize = 28)
+    f.tight_layout()
+    plt.savefig('epoch_%i_batch_%i_recon_stats.png' % (epoch, batch_idx))
 
                 

@@ -120,7 +120,7 @@ class ConvAEEncoder(nn.Module):
         if self.hparams['model_class'] == 'vae':
             self.logvar = torch.clamp(nn.Linear(last_conv_size, 
                                                 self.hparams['n_ae_latents']),
-                                      min= -4.0, max = 4.0)
+                                      min= -3.0, max = 3.0)
         elif self.hparams['model_class'] == 'ae':
             pass
         else:
