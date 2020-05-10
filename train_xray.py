@@ -32,7 +32,7 @@ parser.add_argument("--training", action="store_true")
 parser.add_argument("--evaluating", action="store_true")
 parser.add_argument('--image_size', type=int, default=224, help='')
 parser.add_argument('--num_epochs', type=int, default=160, help='')
-parser.add_argument('--batch_size', type=int, default=64, help='')
+parser.add_argument('--batch_size', type=int, default=32, help='')
 parser.add_argument('--num_latents', type=int, default=100, help='')
 parser.add_argument('--beta', type=float, default= 0.0, help='')
 parser.add_argument('--dataset_size', type=int, default=None, help='')
@@ -41,12 +41,18 @@ parser.add_argument('--ignore_warnings', action="store_true")
 parser.add_argument('--scale_down_image_loss', action="store_true")
 parser.add_argument('--vae_only', action="store_true")
 parser.add_argument("--recon_like_function", default='gaussian', help='image_loss')
-
+parser.add_argument('--num_zero_kl_epochs', type=int, default=20, help='')
+parser.add_argument('--anneal_rate', type=float, default= 0.005, help='')
+# ToDo: maybe add du cuda?
 
 args, _ = parser.parse_known_args()
 # ToDo -- add a condition where it's just vanilla vae.? or probably not necessary if beta
 # defaults to zero. add the torch xrv model, inspect the outputs and make sure
 # it's fine.
+
+# ToDo: different convention from andy's, should be the same. also not sure that "cuda" and not "cuda:0" works.
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print('Main Script- Using device:', device)
 
 class XRayResizer(object):
     def __init__(self, size):
@@ -114,7 +120,7 @@ if args.vae_only == True: # if just vae
 else:
     print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
-    discriminator = xrv.models.DenseNet(weights="all").cuda().eval()
+    discriminator = xrv.models.DenseNet(weights="all").to(device).eval()
     discriminator.op_threshs = None
     # freeze discriminator weights.
     for param in discriminator.parameters():
@@ -145,7 +151,9 @@ rundict = model.fit([None, None, None],
         output_dir = "vae-xray", # ToDo adapt
         torch_seed= int(0),
         batch_size=args.batch_size,
-        scale_down_image_loss = args.scale_down_image_loss
+        scale_down_image_loss = args.scale_down_image_loss,
+        anneal_rate = args.anneal_rate,
+        num_zero_kl_epochs = args.num_zero_kl_epochs,
         )
 
 resdict['model'] = model

@@ -40,6 +40,8 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     torch_seed = kwargs.get("torch_seed", None)
     scale_down_image_loss = kwargs.get("scale_down_image_loss", 
                                        False)
+    anneal_rate = kwargs.get("anneal_rate", 0.005)
+    num_zero_kl_epochs = kwargs.get("num_zero_kl_epochs", 20)
     #data_dim   = Xtrain.shape[1]
     print("-------------------")
     print("fitting vae: ", kwargs)
@@ -86,30 +88,46 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     best_val_loss, best_val_state = np.inf, None
     prev_val_loss = np.inf
     train_elbo = []
-    val_elbo   = []
+    train_kl = []
+    train_disc_loss = []
+    val_elbo = []
+    val_kl = []
+    val_disc_loss = []
     print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
         "Epoch", "train-loss", "val-loss", "train-rmse", "val-rmse", "train/val-p"))
     for epoch in range(1, epochs + 1):
+        
+        # set beta for kl loss, start with 20 epochs with 0 loss, than gradually
+        # add the KL term
+        kl_beta = kl_schedule(epoch, num_zero_kl_epochs, anneal_rate) 
 
         # train/val over entire dataset
-        tloss, trmse, tprecon = train_epoch_func(epoch, model, train_loader,
+        tloss, trmse, tprecon, t_kl_loss, t_disc_loss = train_epoch_func(epoch, model, train_loader,
                                             optimizer     = optimizer,
                                             do_cuda       = do_cuda,
                                             log_interval  = log_interval,
                                             num_samples   = 1,
-                                            scale_down_image_loss=scale_down_image_loss)
-        vloss, vrmse, vprecon = test_epoch_func(epoch, model, 
-                                                val_loader, do_cuda, 
-                                                scale_down_image_loss=scale_down_image_loss)
+                                            scale_down_image_loss=scale_down_image_loss,
+                                            kl_beta = kl_beta)
+        
         if epoch % epoch_log_interval == 0:
+            vloss, vrmse, vprecon, v_kl_loss, v_disc_loss = test_epoch_func(epoch, model, 
+                                                val_loader, do_cuda, 
+                                                scale_down_image_loss=scale_down_image_loss,
+                                                kl_beta = kl_beta)
+        
             print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
               epoch, "%2.4f"%tloss, "%2.4f"%vloss, 
-              "%2.4f"%trmse, "%2.4f"%vrmse, 
+              "%2.4f"%trmse, "%2.4f"%vrmse,
               "%2.3f / %2.3f"%(tprecon, vprecon)))
 
-        # track elbo values
-        train_elbo.append(tloss)
-        val_elbo.append(vloss)
+            # track elbo values
+            train_elbo.append(tloss)
+            train_kl.append(t_kl_loss)
+            train_disc_loss.append(t_disc_loss)
+            val_elbo.append(vloss)
+            val_kl.append(v_kl_loss)
+            val_disc_loss.append(v_disc_loss)
 
         # keep track of best model by validation rmse
         if vrmse < best_val_loss:
@@ -139,7 +157,11 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     model.eval()
 
     resdict = {'train_elbo'   : train_elbo,
+               'train_kl' : train_kl,
+               'train_disc_loss': train_disc_loss,
                'val_elbo'     : val_elbo,
+               'val_kl' : val_kl,
+               'val_disc_loss': val_disc_loss,
                #'model_state'  : model.state_dict(),
                #'data_dim'     : data_dim,
                'cond_dim'     : cond_dim,
@@ -229,19 +251,24 @@ def train_epoch_xraydata(epoch, model, train_loader,
                 do_cuda       = True,
                 log_interval  = None,
                 num_samples   = 1,
-                scale_down_image_loss = False):
+                scale_down_image_loss = False,
+                kl_beta = 1.0):
     '''This function is identical to train_epoch except that it uses 
     a map style dataset from torchxrayvision'''
     # set up train/eval mode
     do_train = False if optimizer is None else True
-    if do_train:
+    if do_train: 
         model.train()
+        if hasattr(model, "discrim_model"): # set discrim_model to eval mode, even when training.
+            model.discrim_model.eval()
     else:
         model.eval()
-
+    
     # run thorugh batches in data loader
     train_loss = 0
     recon_rmse = 0.
+    kl_loss = 0.
+    discrim_loss = 0.
     recon_prob_sse, recon_z_sse = 0., 0.
     loss_list = [] # renewed every epoch for debugging
     #trues, preds = [], []
@@ -258,30 +285,39 @@ def train_epoch_xraydata(epoch, model, train_loader,
 
         # compute encoding distribution
         loss = 0
-        for _ in range(num_samples):
+        # ToDo: num_samples currently not supported, loss isn't accumulated across samples
+        for _ in range(num_samples): 
             recon_batch, z, mu, logvar = model(data)
-            # model computes its own loss
-            loss += model.lossfun(data, recon_batch, 
-                                  target, mu, logvar,
-                                  scale_down_image_loss)            
-            
-            loss_list.append(loss.detach().cpu().numpy())
-            
-            # tests
-            unique_elem, unique_counts = data.view(
-                            data.shape[0],-1).unique(
-                                dim=0, return_counts=True)
-            
 
-            for i in range(data.shape[0]):
-                if(len(data[i,0,:,:].flatten().unique())<2):
-                    print('image %s' %str(i))
-                    print(data[i,0,:,:].flatten().unique())
+            # model computes its own loss. 
+            # loss is a tuple and we minimize its first element.
+            # add KL annealing to the DRVAE function as well that is a func of epoch
+            loss = model.lossfun(
+                                  data, recon_batch, 
+                                  target, mu, logvar,
+                                  kl_beta,
+                                  scale_down_image_loss)   
+            ## previous version.
+            # loss += model.lossfun(data, recon_batch, 
+            #           target, mu, logvar,
+            #           kl_beta,
+            #           scale_down_image_loss) 
+            
+            loss_list.append(loss[0].detach().cpu().numpy()) # loss list within a batch.
+            
+            # tests 
+            # for i in range(data.shape[0]):
+            #     if(len(data[i,0,:,:].flatten().unique())<2):
+            #         print('image %s' %str(i))
+            #         print(data[i,0,:,:].flatten().unique())
+            #     if(len(recon_batch[i,0,:,:].flatten().unique())<2):
+            #         print('recon image %s' %str(i))
+            #         print(recon_batch[i,0,:,:].flatten().unique())
 
             
             if batch_idx>1:
                 if np.abs(loss_list[-1]/loss_list[-2]) > 100.00:
-                    print('loss just jumped!')
+                    print('------loss just jumped!---------')
                     for i in range(data.shape[0]):
                         print('data image %s' %str(i))
                         print(data[i,0,:,:].flatten().unique())
@@ -289,6 +325,9 @@ def train_epoch_xraydata(epoch, model, train_loader,
                         print('recon image %s' %str(i))
                         print(recon_batch[i,0,:,:].flatten().unique())
                         print(len(recon_batch[i,0,:,:].flatten().unique()))
+                        print('mu %s' % str(i))
+                        print(mu[i,:].flatten())
+
                         #print(data)
 
             if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
@@ -320,16 +359,26 @@ def train_epoch_xraydata(epoch, model, train_loader,
 
 
         if do_train:
-            loss.backward()
+            # save last batch of data in case it crashes
+            torch.save(recon_batch, 'recon_batch.pt')
+            torch.save(data, 'data_batch.pt')
+            # minimize first element in the loss tuple.
+            loss[0].backward() 
             optimizer.step()
         
+        # add errors from each batch to the total train_loss of epoch
         recon_rmse += torch.std(recon_batch-data).data.item()*data.shape[0]
-        train_loss += loss.data.item()*data.shape[0]
+        train_loss += loss[0].data.item()*data.shape[0]
+        kl_loss += loss[2].data.item()*data.shape[0]
+        discrim_loss += (loss[0].data.item()*data.shape[0] - 
+                         loss[1].data.item()*data.shape[0])
 
         # if we have a discrim model, track how well it's reconstructing probs
+        # ToDo: current assumption is that the output is on the logit scale, also in the loss
+        # function. if decide to do otherwise, change here and in loss.
         if hasattr(model, "discrim_model"):
-            zrec = model.discrim_model[0](recon_batch)[:, model.dim_out_to_use]
-            zdat = model.discrim_model[0](data)[:, model.dim_out_to_use]
+            zrec = model.discrim_model(recon_batch)[:, model.dim_out_to_use]
+            zdat = model.discrim_model(data)[:, model.dim_out_to_use]
             # note, sigmoid on the output of the model.
             prec = torch.sigmoid(zrec)
             pdat = torch.sigmoid(zdat)
@@ -337,22 +386,30 @@ def train_epoch_xraydata(epoch, model, train_loader,
             recon_prob_sse += torch.var(prec-pdat).data.item()*data.shape[0]
 
         if (log_interval is not None) and (batch_idx % log_interval == 0):
-            print('  epoch: {epoch} [{n}/{N} ({per:.0f}%)]\tLoss: {loss:.6f}'.format(
+            print(
+                '  epoch: {epoch} [{n}/{N} ({per:.0f}%)]\tLoss: {total_loss:.4f}, Disc. Loss: {discrim_loss:.4f}, Lat. Loss: {latent_loss:.4f}, Recon. Loss: {image_loss:.4f}'.format(
                 epoch = epoch,
                 n     = batch_idx * train_loader.batch_size,
                 N     = len(train_loader.dataset),
                 per   = 100. * batch_idx / len(train_loader),
-                loss  = loss.data.item() / len(data)))
+                total_loss  = loss[0].data.item() / len(data),
+                discrim_loss = loss[0].data.item() / len(data) - 
+                    loss[1].data.item() / len(data), # DRVAE - VAE
+                latent_loss = loss[2].data.item() / len(data),
+                image_loss = loss[3].data.item() / len(data),
+                ))
+                
 
     # compute average loss
     N = len(train_loader.dataset)
-    return train_loss/N, recon_rmse/N, np.sqrt(recon_prob_sse/N)
+    return train_loss/N, recon_rmse/N, np.sqrt(recon_prob_sse/N), kl_loss/N, discrim_loss/N
 
 def test_epoch_xraydata(epoch, model, data_loader, 
-                        do_cuda, scale_down_image_loss):
+                        do_cuda, scale_down_image_loss, kl_beta):
     return train_epoch_xraydata(epoch, model, train_loader=data_loader,
                        optimizer=None, do_cuda=do_cuda, 
-                       scale_down_image_loss=scale_down_image_loss)
+                       scale_down_image_loss=scale_down_image_loss,
+                       kl_beta = kl_beta)
 
 
 #def batch_reconstruct(mod, X):
@@ -378,6 +435,27 @@ def test_epoch_xraydata(epoch, model, data_loader,
 #    return torch.cat(batch_res, dim=0)
 #
 
+def kl_schedule(epoch_num, n_epochs_with_zero, rate=0.001):
+    """
+    Anneal the KL term in the VAE cost function
+
+    With rate 0.001 and n_epochs_with_zero = 20, we need 1020 epochs to get
+    kl_lambda = 1
+
+    Args:
+        epoch_num:
+        n_epochs_with_zero:
+        rate:
+
+    Returns:
+        float
+
+    """
+    if epoch_num < n_epochs_with_zero:
+        kl_lambda = 0.0
+    else:
+        kl_lambda = np.minimum((epoch_num - n_epochs_with_zero) * rate, 1)
+    return kl_lambda
 
 
 #######################
@@ -502,4 +580,4 @@ def plot_beat(data, recon_x=None):
         ax.legend()
     return fig, axarr
 
-
+                

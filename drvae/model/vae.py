@@ -70,21 +70,68 @@ class VAE(base.Model):
             errors.append(err.cpu())
         return torch.cat(errors)
 
-    # andy's version
-    def lossfun(self, data, recon_data, target, mu, logvar):
+    # # andy's version # worked
+    # def lossfun(self, data, 
+    #             recon_data, target, 
+    #             mu, logvar, kl_beta):
+    #     # added contiguous() for running things on a CPU. 
+    #     # https://github.com/agrimgupta92/sgan/issues/22
+    #     # Note, currently target isn't used. Maybe kept for conditional VAE?
+    #     # Added kl_beta to do KL annealing.
+    #     # can be negative, https://stats.stackexchange.com/questions/319859/can-log-likelihood-funcion-be-positive
+    #     recon_ll = self.ll_fun(
+    #         recon_data.contiguous().view(recon_data.shape[0], -1),
+    #         data.contiguous().view(data.shape[0], -1))
+    #     kl_to_prior = kldiv_to_std_normal(mu, logvar)
+        
+    #     if self.ll_fun == mse_loss:
+    #         return torch.mean(recon_ll + kl_beta * kl_to_prior)
+    #     else:
+    #         return -torch.mean(recon_ll - kl_beta * kl_to_prior)
+    
+    def loss_fun(self, data, 
+                   recon_data, target, 
+                   mu, logvar, 
+                   kl_beta=1.0, 
+                   scale_down_image_loss=False):
+        """
+        Define model loss
+    
+        Args:
+            self (pytorch model)
+            data (Tensor):
+            recon_data (Tensor):
+            mn (Tensor):
+            target (Tensor, labels)
+            logvar (tf Tensor):
+            kl_beta (tf placeholder):
+            scale_down_image_loss (bool): whether to divide images by 1024 before loss.
+    
+        Returns:
+            tuple: combined loss, latent loss, and image loss for the batch (neg. log. like.)
+    
+        """
         # added contiguous() for running things on a CPU. 
         # https://github.com/agrimgupta92/sgan/issues/22
         # Note, currently target isn't used. Maybe kept for conditional VAE?
+        # Added kl_beta to do KL annealing.
         # can be negative, https://stats.stackexchange.com/questions/319859/can-log-likelihood-funcion-be-positive
+        if scale_down_image_loss:
+            data = data / 1024.0
+            recon_data = recon_data / 1024.0
+            
         recon_ll = self.ll_fun(
-            recon_data.contiguous().view(recon_data.shape[0], -1),
-            data.contiguous().view(data.shape[0], -1))
+                recon_data.contiguous().view(recon_data.shape[0], -1),
+                data.contiguous().view(data.shape[0], -1))
+    
         kl_to_prior = kldiv_to_std_normal(mu, logvar)
         
-        if self.ll_fun == mse_loss:
-            return torch.mean(recon_ll + kl_to_prior)
-        else:
-            return -torch.mean(recon_ll - kl_to_prior)
+        if self.ll_fun == mse_loss: # mse + beta* kl
+            loss = torch.mean(recon_ll + kl_beta * kl_to_prior)
+        else: # neg. log likelihhod + beta * KL 
+            loss = -torch.mean(recon_ll - kl_beta * kl_to_prior)
+    
+        return loss, torch.mean(kl_to_prior), -torch.mean(recon_ll)
 
 class ConvVAE(VAE):
       def __init__(self, hparams, **kwargs):
@@ -187,50 +234,87 @@ class ConvDRVAE(ConvVAE):
     def set_discrim_model(self, discrim_model, 
                           discrim_beta,
                           dim_out_to_use):
-        # # assert that there are 0 trainalbe params in discrim model
-        # assert(len(list(filter(lambda p: p.requires_grad, 
-        #                        discrim_model.parameters())))==0)
-        self.discrim_model = [discrim_model]
-        #self.discrim_model = discrim_model
-        self.discrim_beta = discrim_beta
-        self.dim_out_to_use = dim_out_to_use # chose dimension of the discrim output
-
-    def lossfun(self, data, recon_data, 
-                target, mu, logvar, 
-                scale_down_image_loss):
+        # assert that there are 0 trainalbe params in discrim model
+        assert(len(list(filter(lambda p: p.requires_grad, 
+                                discrim_model.parameters())))==0)
         
+        self.discrim_model = discrim_model # changed from [discrim_model]
+        self.discrim_beta = discrim_beta
+        self.dim_out_to_use = dim_out_to_use # choose dimension of the discrim output
+
+    def lossfun(self, data, 
+                recon_data, target, 
+                mu, logvar, 
+                kl_beta = 1.0,
+                scale_down_image_loss=False):
+        """
+        Args:
+            data: tensor (batch_size, 1, image_size, image_size)
+            recon_data: tensor (batch_size, 1, image_size, image_size)
+            target_labels: tensor (batch_size, num_labels)
+            mu, logvar: tensor (batch_size, num_latents)
+            kl_beta: scalar \in [0.0, 1.0] for KL annealing
+            scale_down_image_loss: bool, whether or not to divide by 1024.0
+        Returns:
+            drvae_loss: torch.float, drvae_loss = vae_loss + disc_loss
+            vae_loss: torch.float, vae_loss = image_loss + latent_loss
+            latent_loss: torch.float, KL(q,p)
+            image_loss: torch.float, negative-log-like of the diff recon_data-data.
+        in any case we minimize just the first element, drvae_loss. 
+        disc_loss can be obtained by subtracting drvae_loss - vae_loss.
+        """
         # vae ELBO loss
-        if scale_down_image_loss:
-            # currently pixels in [-1024, 1024], 
-            # don't want it to dominate the equation
-            vae_loss = super(ConvDRVAE, self).lossfun(
-            data/1024.0, recon_data/1024.0, target, mu, logvar)
-        else:
-            vae_loss = super(ConvDRVAE, self).lossfun(
-            data, recon_data, target, mu, logvar)
+        vae_loss, latent_loss, image_loss = super(ConvDRVAE, self).loss_fun(
+                            data, 
+                            recon_data, target, 
+                            mu, logvar, 
+                            kl_beta, 
+                            scale_down_image_loss)
 
         if self.discrim_beta == 0:
-            return vae_loss
+            return vae_loss, vae_loss, latent_loss, image_loss
 
         # push data and recond through discrim_model
-        # ToDo - validate that this works.
-        zdiscrim_data  = self.discrim_model[0](data)[:, self.dim_out_to_use]
-        zdiscrim_recon = self.discrim_model[0](recon_data)[:, self.dim_out_to_use]
+        # Here output is assumed on the logit scale.
+        
+        zdiscrim_data  = self.discrim_model(data)[:, self.dim_out_to_use]
+        zdiscrim_recon = self.discrim_model(recon_data)[:, self.dim_out_to_use]
 
-        #zdiscrim_data  = self.discrim_model(data)#[:, self.dim_out_to_use]
-        #zdiscrim_recon = self.discrim_model(recon_data)#[:, self.dim_out_to_use]
-
-        # zdiscrim_data  = self.discrim_model[0](
-        #     data.view(data.shape[0],-1))#[:, self.dim_out_to_use]
-        # zdiscrim_recon = self.discrim_model[0](
-        #     recon_data.view(recon_data.shape[0], -1))#[:, self.dim_out_to_use]
-        # squared error (ToDo: consider implementing binary KL)
         disc_loss = self.discrim_beta * \
             torch.sum((zdiscrim_data
                        -zdiscrim_recon)**2)
+        
         assert ~np.isnan(vae_loss.clone().detach().cpu())
         assert ~np.isnan(disc_loss.clone().detach().cpu())
-        return vae_loss + disc_loss
+        
+        drvae_loss = vae_loss + disc_loss
+
+        return drvae_loss, vae_loss, latent_loss, image_loss
+    
+        # # # previously: vae ELBO loss
+        # if scale_down_image_loss:
+        #     # currently pixels in [-1024, 1024], 
+        #     # don't want it to dominate the equation
+        #     vae_loss = super(ConvDRVAE, self).lossfun(
+        #     data/1024.0, recon_data/1024.0, target, mu, logvar)
+        # else:
+        #     vae_loss = super(ConvDRVAE, self).lossfun(
+        #     data, recon_data, target, mu, logvar)
+
+        # if self.discrim_beta == 0:
+        #     return vae_loss
+
+        # # push data and recond through discrim_model
+        # # ToDo - validate that this works.
+        # zdiscrim_data  = self.discrim_model(data)[:, self.dim_out_to_use]
+        # zdiscrim_recon = self.discrim_model(recon_data)[:, self.dim_out_to_use]
+
+        # disc_loss = self.discrim_beta * \
+        #     torch.sum((zdiscrim_data
+        #                -zdiscrim_recon)**2)
+        # assert ~np.isnan(vae_loss.clone().detach().cpu())
+        # assert ~np.isnan(disc_loss.clone().detach().cpu())
+        # return vae_loss + disc_loss
     
 
 
