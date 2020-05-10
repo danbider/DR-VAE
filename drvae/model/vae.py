@@ -209,9 +209,7 @@ class ConvVAE(VAE):
         :obj:`tuple`
             - y (:obj:`torch.Tensor`): output of shape (n_frames, n_channels, y_pix, x_pix)
             - x (:obj:`torch.Tensor`): hidden representation of shape (n_frames, n_latents)
-        To-Do: check how it'll work by changing x. connect with train script, and loss.
-        Ideal - scaling occurs inside the forward method of the VAE,
-        no need to worry about that outside of this module.'
+        ToDo: consider adding a condition for clamping, doing this inside aes.py'
         """
         if self.scale_pixels:
             #x = x/2048.0 + 0.5
@@ -221,7 +219,7 @@ class ConvVAE(VAE):
         if use_mean:
             z = mu
         else:
-            z = self.reparameterize(mu, lnvar) # sample using reparam trick
+            z = self.reparameterize(mu, torch.clamp(lnvar, min=-3.0, max=3.0)) # sample using reparam trick
         x_bar = self.decoding_net(z , pool_idx, outsize, dataset=dataset)
         if self.scale_pixels:
             #x_bar = (x_bar - 0.5)*2048.0
