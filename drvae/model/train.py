@@ -315,8 +315,8 @@ def train_epoch_xraydata(epoch, model, train_loader,
             #         print(recon_batch[i,0,:,:].flatten().unique())
             if do_train:
                 with torch.no_grad():
-                    loss_list.append(loss[0].item()) # loss list within a an epoch.
-                    latent_loss_list.append(loss[2].item())
+                    loss_list.append(loss[0].data.item()) # loss list within a an epoch.
+                    latent_loss_list.append(loss[2].data.item())
                     if batch_idx>1:
                         if np.abs(loss_list[-1]/loss_list[-2]) > 100.00 or \
                             np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 100.00:
@@ -329,6 +329,8 @@ def train_epoch_xraydata(epoch, model, train_loader,
                             torch.save(logvar, 'prob_logvar_epoch%i_batch_%i.pt' %(epoch, batch_idx))
                             print('tensors, reconstructions and latent stats saved in %s' % \
                                   os.getcwd())
+                            loss_list = loss_list[-2:]
+                            latent_loss_list = latent_loss_list[-2:]
         
                             # for i in range(data.shape[0]):
                             #     print('data image %s' %str(i))
