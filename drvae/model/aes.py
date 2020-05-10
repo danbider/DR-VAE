@@ -217,7 +217,8 @@ class ConvAEEncoder(nn.Module):
         if self.hparams['model_class'] == 'ae':
             return self.FF(x), pool_idx, target_output_size
         elif self.hparams['model_class'] == 'vae':
-            return self.FF(x), self.logvar(x), pool_idx, target_output_size
+            return self.FF(x), torch.clamp(self.logvar(x), min=-3.0, max=3.0), \
+                pool_idx, target_output_size
         else:
             raise ValueError('"%s" is not a valid model class' % self.hparams['model_class'])
 

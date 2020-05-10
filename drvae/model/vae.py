@@ -219,7 +219,7 @@ class ConvVAE(VAE):
         if use_mean:
             z = mu
         else:
-            z = self.reparameterize(mu, torch.clamp(lnvar, min=-3.0, max=3.0)) # sample using reparam trick
+            z = self.reparameterize(mu, lnvar) # sample using reparam trick
         x_bar = self.decoding_net(z , pool_idx, outsize, dataset=dataset)
         if self.scale_pixels:
             #x_bar = (x_bar - 0.5)*2048.0

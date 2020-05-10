@@ -373,11 +373,11 @@ def train_epoch_xraydata(epoch, model, train_loader,
 
         if do_train:
             # save last batch of data in case it crashes. can remove when runs smoothly.
-            torch.save(recon_batch, 'recon_batch.pt')
-            torch.save(data, 'recon_batch.pt')
-            torch.save(mu, 'mu_batch.pt')
-            torch.save(logvar, 'logvar_batch.pt')
-            torch.save(logvar, 'z_batch.pt')
+            # torch.save(recon_batch, 'recon_batch.pt')
+            # torch.save(data, 'recon_batch.pt')
+            # torch.save(mu, 'mu_batch.pt')
+            # torch.save(logvar, 'logvar_batch.pt')
+            # torch.save(logvar, 'z_batch.pt')
 
             # minimize first element in the loss tuple.
             loss[0].backward() 
