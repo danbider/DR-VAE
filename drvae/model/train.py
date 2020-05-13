@@ -314,6 +314,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
         if hasattr(model, "discrim_model"):
             zrec = model.discrim_model(recon_batch)[:, model.dim_out_to_use]
             zdat = model.discrim_model(data)[:, model.dim_out_to_use]
+            print(zrec.shape)
             # note, sigmoid on the output of the model.
             prec = torch.sigmoid(zrec)
             pdat = torch.sigmoid(zdat)

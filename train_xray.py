@@ -73,7 +73,7 @@ class XRayResizer(object):
             sys.exit('dataloader warning: all pixel values are the same.')
         return resized
 
-output_dir = os.path.join("./drvae-xray", 
+output_dir = os.path.join("./experiments-kaggle", 
                           "beta_%s_num_latents_%i" % (str(args.beta), args.num_latents))
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -110,12 +110,6 @@ arch_dict = load_handcrafted_arch(ae_arch_json=os.path.join(
                                   input_dim=np.array([1, args.image_size, args.image_size]), # was np.array([1, 223, 223])
                                   n_ae_latents=args.num_latents,
                                   check_memory=False)
-# # add a couple of entries
-# arch_dict["model_class"] = 'vae'
-# arch_dict['ae_decoding_final_nonlin'] = 'clamp' # [str] 'linear' | 'sigmoid', if image is on [0,1] | 'clamp'
-# arch_dict['clamp_minmax'] = [-1.0,1.0]
-# just check that it's there before deleting these lines.
-print("decoding non linearity: " + arch_dict['ae_decoding_final_nonlin'])
 
 if args.vae_only == True: # if just vae
     print('fitting just VAE.')
