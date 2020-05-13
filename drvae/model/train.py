@@ -23,7 +23,6 @@ ln2pi = np.log(2*np.pi)
 
 def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     # args
-    #kwargs = {}
     do_cuda       = kwargs.get("do_cuda", torch.cuda.is_available())
     batch_size    = kwargs.get("batch_size", 1024)
     epochs        = kwargs.get("epochs", 40)
@@ -58,7 +57,8 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
        train_epoch_func = train_epoch_xraydata
        test_epoch_func = test_epoch_xraydata
     else: 
-        # andy's version - input data to func
+        # andy's version - input data to func 
+        # in the form Xtrain, Xval, Xtest, Ytrain, Yval, Ytest
         train_data = torch.utils.data.TensorDataset(
             torch.FloatTensor(Xtrain), torch.FloatTensor(Ytrain[:,None]))
         val_data = torch.utils.data.TensorDataset(
@@ -179,6 +179,172 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
                }
     return resdict
 
+################################################################
+# Training functions -- for xray   #
+################################################################
+
+def train_epoch_xraydata(epoch, model, train_loader,
+                optimizer     = None,
+                do_cuda       = True,
+                log_interval  = None,
+                num_samples   = 1,
+                scale_down_image_loss = False,
+                kl_beta = 1.0,
+                output_dir = None):
+    '''This function is identical to train_epoch except that it uses 
+    a map style dataset from torchxrayvision'''
+    # set up train/eval mode
+    do_train = False if optimizer is None else True
+    if do_train: 
+        model.train()
+        if hasattr(model, "discrim_model"): # set discrim_model to eval mode, even when training.
+            model.discrim_model.eval()
+    else:
+        model.eval()
+    
+    # run thorugh batches in data loader
+    train_loss = 0
+    recon_rmse = 0.
+    kl_loss = 0.
+    discrim_loss = 0.
+    recon_prob_sse, recon_z_sse = 0., 0.
+    loss_list = [] # renewed every epoch for debugging
+    latent_loss_list = []
+    #trues, preds = [], []
+    #t = tqdm(train_loader) # and also had t instead of train loader inside brackets.
+    for batch_idx, samples in enumerate(train_loader):
+        data = samples["img"].float()
+        target = samples["lab"]
+
+        if do_cuda:
+            data, target = data.cuda(), target.cuda()
+
+        if do_train:
+            optimizer.zero_grad()
+
+        # compute encoding distribution
+        loss = 0
+        # ToDo: num_samples currently not supported, loss isn't accumulated across samples
+        for _ in range(num_samples): 
+            try:
+                recon_batch, z, mu, logvar = model(data)
+            except Exception as e:
+                print('VAE Forward pass failed.') # ToDo: save tensors in each forward call.
+                print(repr(e))
+
+            # model computes its own loss. 
+            # loss is a tuple and we minimize its first element.
+            try:
+                loss = model.lossfun(
+                                      data, recon_batch, 
+                                      target, mu, logvar,
+                                      kl_beta,
+                                      scale_down_image_loss)
+            except Exception as e:
+                print('Failed calculating loss in epoch %i batch %i with kl_beta = %.2f' \
+                      % (epoch, batch_idx, kl_beta))
+                print(repr(e))
+                print('Saving critical tensors...')
+                save_critical_tensors(data, recon_batch, 
+                                      mu, logvar, z, output_dir)
+                print('Plotting batch stats...')
+                plot_recon_batch(recon_batch, data, 
+                                 epoch, batch_idx, output_dir)
+                plot_bottleneck_stats(mu, logvar, z, 
+                                      epoch, batch_idx, 
+                                      100, output_dir)
+                
+            # checks:
+            if do_train:
+                with torch.no_grad():
+                    loss_list.append(loss[0].data.item()) # loss list within a an epoch.
+                    latent_loss_list.append(loss[2].data.item())
+                    if batch_idx>1:
+                        if np.abs(loss_list[-1]/loss_list[-2]) > 1000.00 or \
+                            np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 1000.00:
+                            print('------batch loss just jumped!---------')
+                            plot_recon_batch(recon_batch, data, epoch, batch_idx)
+                            plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100)
+                            print('Saving critical tensors...')
+                            save_critical_tensors(data, recon_batch, mu, logvar, z)
+                            loss_list = loss_list[-2:]
+                            latent_loss_list = latent_loss_list[-2:]
+
+                    if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
+                        (data.view(data.shape[0],-1).sum(dim=1).detach().cpu().numpy() == 0).any() or \
+                        np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())) !=0 or \
+                        np.sum(np.isnan(mu.detach().cpu().numpy().flatten())) !=0 or \
+                        np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())) !=0:
+                        
+                        print('------encountered nans or all zeros---------')
+                        plot_recon_batch(recon_batch, data, epoch, batch_idx)
+                        plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100)
+                        save_critical_tensors(data, recon_batch, mu, logvar, z)
+
+
+        if do_train:
+            try: 
+                loss[0].backward() # minimize first element in the loss tuple - total loss.
+                optimizer.step()
+            except Exception as e:
+                print('Failed calculating gradients and taking a step.')
+                print(repr(e))
+                print('Saving critical tensors...')
+                save_critical_tensors(data, recon_batch, 
+                                      mu, logvar, z, output_dir)
+                print('Saving diagnostic figures...')
+                plot_recon_batch(recon_batch, data, epoch, 
+                                 batch_idx, output_dir)
+                plot_bottleneck_stats(mu, logvar, z, 
+                                      epoch, batch_idx, 100,
+                                      output_dir)
+        
+        # add errors from each batch to the total train_loss of epoch
+        recon_rmse += torch.std(recon_batch-data).data.item()*data.shape[0]
+        train_loss += loss[0].data.item()*data.shape[0]
+        kl_loss += loss[2].data.item()*data.shape[0]
+        discrim_loss += (loss[0].data.item()*data.shape[0] - 
+                         loss[1].data.item()*data.shape[0])
+
+        # if we have a discrim model, track how well it's reconstructing probs
+        # ToDo: current assumption is that the output is on the logit scale, also in the loss
+        # function. if decide to do otherwise, change here and in loss.
+        if hasattr(model, "discrim_model"):
+            zrec = model.discrim_model(recon_batch)[:, model.dim_out_to_use]
+            zdat = model.discrim_model(data)[:, model.dim_out_to_use]
+            # note, sigmoid on the output of the model.
+            prec = torch.sigmoid(zrec)
+            pdat = torch.sigmoid(zdat)
+            recon_z_sse += torch.var(zrec-zdat).data.item()*data.shape[0]
+            recon_prob_sse += torch.var(prec-pdat).data.item()*data.shape[0]
+
+        if (log_interval is not None) and (batch_idx % log_interval == 0):
+            print(
+                '  epoch: {epoch} [{n}/{N} ({per:.0f}%)]\tLoss: {total_loss:.4f}, Disc. Loss: {discrim_loss:.4f}, Lat. Loss: {latent_loss:.4f}, Recon. Loss: {image_loss:.4f}'.format(
+                epoch = epoch,
+                n     = batch_idx * train_loader.batch_size,
+                N     = len(train_loader.dataset),
+                per   = 100. * batch_idx / len(train_loader),
+                total_loss  = loss[0].data.item() / len(data),
+                discrim_loss = loss[0].data.item() / len(data) - 
+                    loss[1].data.item() / len(data), # DRVAE - VAE
+                latent_loss = loss[2].data.item() / len(data),
+                image_loss = loss[3].data.item() / len(data),
+                ))
+                
+
+    # compute average loss
+    N = len(train_loader.dataset)
+    return train_loss/N, recon_rmse/N, np.sqrt(recon_prob_sse/N), kl_loss/N, discrim_loss/N
+
+def test_epoch_xraydata(epoch, model, data_loader, 
+                        do_cuda, scale_down_image_loss, 
+                        kl_beta, output_dir):
+    return train_epoch_xraydata(epoch, model, train_loader=data_loader,
+                       optimizer=None, do_cuda=do_cuda, 
+                       scale_down_image_loss=scale_down_image_loss,
+                       kl_beta = kl_beta, output_dir = output_dir)
+
 
 
 ################################################################
@@ -251,190 +417,6 @@ def train_epoch(epoch, model, train_loader,
 def test_epoch(epoch, model, data_loader, do_cuda):
     return train_epoch(epoch, model, train_loader=data_loader,
                        optimizer=None, do_cuda=do_cuda)
-
-def train_epoch_xraydata(epoch, model, train_loader,
-                optimizer     = None,
-                do_cuda       = True,
-                log_interval  = None,
-                num_samples   = 1,
-                scale_down_image_loss = False,
-                kl_beta = 1.0):
-    '''This function is identical to train_epoch except that it uses 
-    a map style dataset from torchxrayvision'''
-    # set up train/eval mode
-    do_train = False if optimizer is None else True
-    if do_train: 
-        model.train()
-        if hasattr(model, "discrim_model"): # set discrim_model to eval mode, even when training.
-            model.discrim_model.eval()
-    else:
-        model.eval()
-    
-    # run thorugh batches in data loader
-    train_loss = 0
-    recon_rmse = 0.
-    kl_loss = 0.
-    discrim_loss = 0.
-    recon_prob_sse, recon_z_sse = 0., 0.
-    loss_list = [] # renewed every epoch for debugging
-    latent_loss_list = []
-    #trues, preds = [], []
-    #t = tqdm(train_loader) # and also had t instead of train loader inside brackets.
-    for batch_idx, samples in enumerate(train_loader):
-        data = samples["img"].float()
-        target = samples["lab"]
-
-        if do_cuda:
-            data, target = data.cuda(), target.cuda()
-
-        if do_train:
-            optimizer.zero_grad()
-
-        # compute encoding distribution
-        loss = 0
-        # ToDo: num_samples currently not supported, loss isn't accumulated across samples
-        for _ in range(num_samples): 
-            recon_batch, z, mu, logvar = model(data)
-
-            # model computes its own loss. 
-            # loss is a tuple and we minimize its first element.
-            # add KL annealing to the DRVAE function as well that is a func of epoch
-            loss = model.lossfun(
-                                  data, recon_batch, 
-                                  target, mu, logvar,
-                                  kl_beta,
-                                  scale_down_image_loss)   
-            ## previous version.
-            # loss += model.lossfun(data, recon_batch, 
-            #           target, mu, logvar,
-            #           kl_beta,
-            #           scale_down_image_loss) 
-            
-            # tests 
-            # for i in range(data.shape[0]):
-            #     if(len(data[i,0,:,:].flatten().unique())<2):
-            #         print('image %s' %str(i))
-            #         print(data[i,0,:,:].flatten().unique())
-            #     if(len(recon_batch[i,0,:,:].flatten().unique())<2):
-            #         print('recon image %s' %str(i))
-            #         print(recon_batch[i,0,:,:].flatten().unique())
-            if do_train:
-                with torch.no_grad():
-                    loss_list.append(loss[0].data.item()) # loss list within a an epoch.
-                    latent_loss_list.append(loss[2].data.item())
-                    if batch_idx>1:
-                        if np.abs(loss_list[-1]/loss_list[-2]) > 1000.00 or \
-                            np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 1000.00:
-                            print('------batch loss just jumped!---------')
-                            plot_recon_batch(recon_batch, data, epoch, batch_idx)
-                            plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100)
-                            torch.save(recon_batch, 'prob_recon_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                            torch.save(data, 'prob_data_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                            torch.save(mu, 'prob_mu_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                            torch.save(logvar, 'prob_logvar_epoch%i_batch_%i.pt' %(epoch, batch_idx))
-                            print('tensors, reconstructions and latent stats saved in %s' % \
-                                  os.getcwd())
-                            loss_list = loss_list[-2:]
-                            latent_loss_list = latent_loss_list[-2:]
-        
-                            # for i in range(data.shape[0]):
-                            #     print('data image %s' %str(i))
-                            #     print(data[i,0,:,:].flatten().unique())
-                            #     print(len(data[i,0,:,:].flatten().unique()))
-                            #     print('recon image %s' %str(i))
-                            #     print(recon_batch[i,0,:,:].flatten().unique())
-                            #     print(len(recon_batch[i,0,:,:].flatten().unique()))
-                            #     print('mu %s' % str(i))
-                            #     print(mu[i,:].flatten())
-                            # plot and save
-                           
-                                #print(data)
-        
-                    if np.sum(np.isnan(data.detach().cpu().numpy().flatten())) !=0 or \
-                        (data.view(data.shape[0],-1).sum(dim=1).detach().cpu().numpy() == 0).any() or \
-                        np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())) !=0 or \
-                        np.sum(np.isnan(mu.detach().cpu().numpy().flatten())) !=0 or \
-                        np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())) !=0:
-                        
-                        print('data is nan:')
-                        print(np.sum(np.isnan(data.detach().cpu().numpy().flatten())))
-                        print(np.min(data.detach().cpu().numpy().flatten()))
-                        print(np.max(data.detach().cpu().numpy().flatten()))
-                        print('data raw:')
-                        print(data)
-                        print('recon is nan:')
-                        print(np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())))
-                        print(np.min(recon_batch.detach().cpu().numpy().flatten()))
-                        print(np.max(recon_batch.detach().cpu().numpy().flatten()))
-                        print('mu is nan:')
-                        print(np.sum(np.isnan(mu.detach().cpu().numpy().flatten())))
-                        print(mu.detach().cpu().numpy().flatten())
-                        print(np.min(mu.detach().cpu().numpy().flatten()))
-                        print(np.max(mu.detach().cpu().numpy().flatten()))
-                        print('lnvar is nan:')
-                        print(np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())))
-                        print(logvar.detach().cpu().numpy().flatten())
-                        print(np.min(logvar.detach().cpu().numpy().flatten()))
-                        print(np.max(logvar.detach().cpu().numpy().flatten()))
-
-
-        if do_train:
-            # save last batch of data in case it crashes. can remove when runs smoothly.
-            # torch.save(recon_batch, 'recon_batch.pt')
-            # torch.save(data, 'recon_batch.pt')
-            # torch.save(mu, 'mu_batch.pt')
-            # torch.save(logvar, 'logvar_batch.pt')
-            # torch.save(logvar, 'z_batch.pt')
-
-            # minimize first element in the loss tuple.
-            loss[0].backward() 
-            optimizer.step()
-        
-        # add errors from each batch to the total train_loss of epoch
-        recon_rmse += torch.std(recon_batch-data).data.item()*data.shape[0]
-        train_loss += loss[0].data.item()*data.shape[0]
-        kl_loss += loss[2].data.item()*data.shape[0]
-        discrim_loss += (loss[0].data.item()*data.shape[0] - 
-                         loss[1].data.item()*data.shape[0])
-
-        # if we have a discrim model, track how well it's reconstructing probs
-        # ToDo: current assumption is that the output is on the logit scale, also in the loss
-        # function. if decide to do otherwise, change here and in loss.
-        if hasattr(model, "discrim_model"):
-            zrec = model.discrim_model(recon_batch)[:, model.dim_out_to_use]
-            zdat = model.discrim_model(data)[:, model.dim_out_to_use]
-            # note, sigmoid on the output of the model.
-            prec = torch.sigmoid(zrec)
-            pdat = torch.sigmoid(zdat)
-            recon_z_sse += torch.var(zrec-zdat).data.item()*data.shape[0]
-            recon_prob_sse += torch.var(prec-pdat).data.item()*data.shape[0]
-
-        if (log_interval is not None) and (batch_idx % log_interval == 0):
-            print(
-                '  epoch: {epoch} [{n}/{N} ({per:.0f}%)]\tLoss: {total_loss:.4f}, Disc. Loss: {discrim_loss:.4f}, Lat. Loss: {latent_loss:.4f}, Recon. Loss: {image_loss:.4f}'.format(
-                epoch = epoch,
-                n     = batch_idx * train_loader.batch_size,
-                N     = len(train_loader.dataset),
-                per   = 100. * batch_idx / len(train_loader),
-                total_loss  = loss[0].data.item() / len(data),
-                discrim_loss = loss[0].data.item() / len(data) - 
-                    loss[1].data.item() / len(data), # DRVAE - VAE
-                latent_loss = loss[2].data.item() / len(data),
-                image_loss = loss[3].data.item() / len(data),
-                ))
-                
-
-    # compute average loss
-    N = len(train_loader.dataset)
-    return train_loss/N, recon_rmse/N, np.sqrt(recon_prob_sse/N), kl_loss/N, discrim_loss/N
-
-def test_epoch_xraydata(epoch, model, data_loader, 
-                        do_cuda, scale_down_image_loss, kl_beta):
-    return train_epoch_xraydata(epoch, model, train_loader=data_loader,
-                       optimizer=None, do_cuda=do_cuda, 
-                       scale_down_image_loss=scale_down_image_loss,
-                       kl_beta = kl_beta)
-
 
 #def batch_reconstruct(mod, X):
 #    data = torch.utils.data.TensorDataset(
@@ -604,7 +586,9 @@ def plot_beat(data, recon_x=None):
         ax.legend()
     return fig, axarr
 
-def plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100):
+def plot_bottleneck_stats(mu, logvar, z, epoch, 
+                          batch_idx, bins = 100,
+                          save_dir = os.getcwd()):
     mu_np = mu.detach().cpu().numpy().flatten()
     logvar_np = logvar.detach().cpu().numpy().flatten()
     z_np = z.detach().cpu().numpy().flatten()
@@ -620,7 +604,8 @@ def plot_bottleneck_stats(mu, logvar, z, epoch, batch_idx, bins = 100):
     plt.savefig('epoch_%i_batch_%i_latent_stats.png' % (epoch, batch_idx))
     plt.close("all")
     
-def plot_recon_batch(recon, data, epoch, batch_idx):
+def plot_recon_batch(recon, data, epoch, 
+                     batch_idx, save_dir = os.getcwd()):
     """"wrapper around plot_images."""
     recon = recon.detach().cpu().numpy()
     data = data.detach().cpu().numpy()
@@ -637,7 +622,41 @@ def plot_recon_batch(recon, data, epoch, batch_idx):
                 cmap='gray', vmin=None, vmax=None)
     f.suptitle('recons: epoch %i batch %i' % (epoch, batch_idx), fontsize = 28)
     f.tight_layout()
-    plt.savefig('epoch_%i_batch_%i_recon_stats.png' % (epoch, batch_idx))
+    plt.savefig(os.path.join(save_dir,
+                             'epoch_%i_batch_%i_recon_stats.png' % (epoch, batch_idx)))
     plt.close("all")
 
-                
+def save_critical_tensors(data, recon_batch,  mu, 
+                          logvar, z, save_dir = os.getcwd()):
+    
+    torch.save(data, os.path.join(save_dir, 'data_batch.pt'))
+    torch.save(recon_batch, os.path.join(save_dir,'recon_batch.pt'))
+    torch.save(mu, os.path.join(save_dir, 'mu_batch.pt'))
+    torch.save(logvar, os.path.join(save_dir,'logvar_batch.pt'))
+    torch.save(z, os.path.join(save_dir, 'z_batch.pt'))
+    
+    print('Critical tensors saved in %s' % str(save_dir))
+    
+## ==== some debugging prints
+    
+# print('data is nan:')
+# print(np.sum(np.isnan(data.detach().cpu().numpy().flatten())))
+# print(np.min(data.detach().cpu().numpy().flatten()))
+# print(np.max(data.detach().cpu().numpy().flatten()))
+# print('data raw:')
+# print(data)
+# print('recon is nan:')
+# print(np.sum(np.isnan(recon_batch.detach().cpu().numpy().flatten())))
+# print(np.min(recon_batch.detach().cpu().numpy().flatten()))
+# print(np.max(recon_batch.detach().cpu().numpy().flatten()))
+# print('mu is nan:')
+# print(np.sum(np.isnan(mu.detach().cpu().numpy().flatten())))
+# print(mu.detach().cpu().numpy().flatten())
+# print(np.min(mu.detach().cpu().numpy().flatten()))
+# print(np.max(mu.detach().cpu().numpy().flatten()))
+# print('lnvar is nan:')
+# print(np.sum(np.isnan(logvar.detach().cpu().numpy().flatten())))
+# print(logvar.detach().cpu().numpy().flatten())
+# print(np.min(logvar.detach().cpu().numpy().flatten()))
+# print(np.max(logvar.detach().cpu().numpy().flatten()))
+

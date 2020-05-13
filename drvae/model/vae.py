@@ -600,7 +600,11 @@ class BeatMlpCondVAE(VAE):
 def mse_loss(recon_x, x):
     return torch.sum((recon_x - x) ** 2, dim=1)
 
-def recon_loglike_function(recon_x, x, noise_var=.1*.1): # was .1
+def recon_loglike_function(recon_x, x, noise_var=.1*.1):
+    """Gaussian log likelihood with a fixed noise_var.
+    Should be roughly on the same scale as KL (except that
+    KL is a function of num_latents, and this is a function of 
+    num_pixels"""
     num_obs_per_batch = x.shape[1]
     ln_noise_var = np.log(noise_var)
     diff = x - recon_x
@@ -617,6 +621,18 @@ def kldiv_to_std_normal(mu, logvar):
     # KL(q(z) || p(z)) where q(z) is the recognition network normal
     KL_q_to_prior = .5*torch.sum(logvar.exp() - logvar + mu.pow(2) - 1, dim=1)
     return KL_q_to_prior
+
+def kldiv_bernoulli(recon_pred, data_pred):
+    """computes kl divergence between two bernoulli distribution.
+    this loss assumes that the output of the models
+    Args: 
+        recon_pred - prob. of label spitted by classifier when fed with reconstr images, torch.Size(batch_size). 
+        data_pred - prob. of label spitted by classifier when fed with true images, torch.Size(batch_size). 
+        """
+    #make sure dimensions are right and write it down
+    
+
+
 
 
 ##################
