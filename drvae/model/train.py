@@ -108,14 +108,16 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
                                             log_interval  = log_interval,
                                             num_samples   = 1,
                                             scale_down_image_loss=scale_down_image_loss,
-                                            kl_beta = kl_beta)
+                                            kl_beta = kl_beta,
+                                            output_dir = output_dir)
         
         print('Finished training epoch %i' % epoch)
         print('Predicting validation dataset...')
         vloss, vrmse, vprecon, v_kl_loss, v_disc_loss = test_epoch_func(epoch, model, 
                                     val_loader, do_cuda, 
                                     scale_down_image_loss=scale_down_image_loss,
-                                    kl_beta = kl_beta)
+                                    kl_beta = kl_beta,
+                                    output_dir = output_dir)
         
         print('Finished.')
         

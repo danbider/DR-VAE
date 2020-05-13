@@ -115,7 +115,7 @@ arch_dict = load_handcrafted_arch(ae_arch_json=os.path.join(
 # arch_dict['ae_decoding_final_nonlin'] = 'clamp' # [str] 'linear' | 'sigmoid', if image is on [0,1] | 'clamp'
 # arch_dict['clamp_minmax'] = [-1.0,1.0]
 # just check that it's there before deleting these lines.
-print("decoding non linearity: " + "arch_dict['ae_decoding_final_nonlin']")
+print("decoding non linearity: " + arch_dict['ae_decoding_final_nonlin'])
 
 if args.vae_only == True: # if just vae
     print('fitting just VAE.')
