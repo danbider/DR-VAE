@@ -59,9 +59,9 @@
 
 "ae_decoding layer_type": [null], # type: list
 
-"ae_decoding_last_FF_layer": 0 # type: int, help: 0 = False, 1 = True
+"ae_decoding_last_FF_layer": 0, # type: int, help: 0 = False, 1 = True
 
-"ae_decoding_final_nonlin": "clamp" # type: str, help: 'linear' | 'sigmoid' | 'clamp'
+"ae_decoding_final_nonlin": "clamp", # type: str, help: 'linear' | 'sigmoid' | 'clamp'
 
 "clamp_minmax": [-1.0, 1.0] # type: list [min_val [float], max_val [float]]
 
