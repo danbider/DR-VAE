@@ -74,7 +74,7 @@ class XRayResizer(object):
         return resized
 
 output_dir = os.path.join("./drvae-xray", 
-                          "beta_%_num_latents_%i" % (str(args.beta), args.num_latents))
+                          "beta_%s_num_latents_%i" % (str(args.beta), args.num_latents))
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
