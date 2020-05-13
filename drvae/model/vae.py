@@ -622,14 +622,21 @@ def kldiv_to_std_normal(mu, logvar):
     KL_q_to_prior = .5*torch.sum(logvar.exp() - logvar + mu.pow(2) - 1, dim=1)
     return KL_q_to_prior
 
-def kldiv_bernoulli(recon_pred, data_pred):
-    """computes kl divergence between two bernoulli distribution.
-    this loss assumes that the output of the models
+def kldiv_bernoulli(q, p):
+    """computes kl divergence between two bernoulli distributions.
+    this loss assumes that the output of the models is a probability.
+    KL(q||p) = q\cdot\ln\frac{q}{p} + (1-q)\cdot\ln\frac{1-q}{1-p}
     Args: 
-        recon_pred - prob. of label spitted by classifier when fed with reconstr images, torch.Size(batch_size). 
-        data_pred - prob. of label spitted by classifier when fed with true images, torch.Size(batch_size). 
+        q: prob. of label spitted by classifier(recon), torch.Size(batch_size). 
+        p: prob. of label spitted by classifier(data), torch.Size(batch_size). 
+    Returns:
+        KL div: tensor.Size(batch_size)
+    
         """
-    #make sure dimensions are right and write it down
+    KL = q*(torch.log(q) - torch.log(p)) + \
+         (1.0 - q)*(torch.log(1.0-q) - torch.log(1.0-p))
+    
+    return KL
     
 
 
