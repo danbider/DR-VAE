@@ -120,7 +120,7 @@ else:
     print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
     discriminator = xrv.models.DenseNet(weights="all").to(device).eval()
-    discriminator.op_threshs = None
+    # discriminator.op_threshs = None
     # freeze discriminator weights.
     for param in discriminator.parameters():
             param.requires_grad = False
@@ -130,7 +130,8 @@ else:
                   loglike_function = args.recon_like_function)
     model.set_discrim_model(discriminator, 
                             discrim_beta = args.beta,
-                            dim_out_to_use=8)
+                            dim_out_to_use=8, 
+                            disc_output_type = 'probs')
 
 print('Built model.')
 print(model.__str__())
@@ -147,7 +148,7 @@ rundict = model.fit([None, None, None],
         log_interval = args.log_interval,
         epoch_log_interval = args.epoch_log_interval,
         plot_interval = 10,
-        output_dir = "vae-xray", # ToDo adapt
+        output_dir = output_dir,
         torch_seed= int(0),
         batch_size=args.batch_size,
         scale_down_image_loss = args.scale_down_image_loss,

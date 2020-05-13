@@ -237,7 +237,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
             # model computes its own loss. 
             # loss is a tuple and we minimize its first element.
             try:
-                loss = model.lossfun(
+                loss_tuple = model.lossfun(
                                       data, recon_batch, 
                                       target, mu, logvar,
                                       kl_beta,
@@ -259,8 +259,8 @@ def train_epoch_xraydata(epoch, model, train_loader,
             # checks:
             if do_train:
                 with torch.no_grad():
-                    loss_list.append(loss[0].data.item()) # loss list within a an epoch.
-                    latent_loss_list.append(loss[2].data.item())
+                    loss_list.append(loss_tuple[0].data.item()) # loss list within a an epoch.
+                    latent_loss_list.append(loss_tuple[2].data.item())
                     if batch_idx>1:
                         if np.abs(loss_list[-1]/loss_list[-2]) > 1000.00 or \
                             np.abs(latent_loss_list[-1]/latent_loss_list[-2]) > 1000.00:
@@ -286,7 +286,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
 
         if do_train:
             try: 
-                loss[0].backward() # minimize first element in the loss tuple - total loss.
+                loss_tuple[0].backward() # minimize first element in the loss tuple - total loss.
                 optimizer.step()
             except Exception as e:
                 print('Failed calculating gradients and taking a step.')
@@ -303,35 +303,25 @@ def train_epoch_xraydata(epoch, model, train_loader,
         
         # add errors from each batch to the total train_loss of epoch
         recon_rmse += torch.std(recon_batch-data).data.item()*data.shape[0]
-        train_loss += loss[0].data.item()*data.shape[0]
-        kl_loss += loss[2].data.item()*data.shape[0]
-        discrim_loss += (loss[0].data.item()*data.shape[0] - 
-                         loss[1].data.item()*data.shape[0])
-
-        # if we have a discrim model, track how well it's reconstructing probs
-        # ToDo: current assumption is that the output is on the logit scale, also in the loss
-        # function. if decide to do otherwise, change here and in loss.
+        train_loss += loss_tuple[0].data.item()*data.shape[0]
+        kl_loss += loss_tuple[2].data.item()*data.shape[0]
         if hasattr(model, "discrim_model"):
-            zrec = model.discrim_model(recon_batch)[:, model.dim_out_to_use]
-            zdat = model.discrim_model(data)[:, model.dim_out_to_use]
-            # note, sigmoid on the output of the model.
-            prec = torch.sigmoid(zrec)
-            pdat = torch.sigmoid(zdat)
-            recon_z_sse += torch.var(zrec-zdat).data.item()*data.shape[0]
-            recon_prob_sse += torch.var(prec-pdat).data.item()*data.shape[0]
+            discrim_loss += loss_tuple[4].data.item()*data.shape[0] # NOT weighted by beta
+        else: 
+            discrim_loss += 0.0
 
         if (log_interval is not None) and (batch_idx % log_interval == 0):
             print(
-                '  epoch: {epoch} [{n}/{N} ({per:.0f}%)]\tLoss: {total_loss:.4f}, Disc. Loss: {discrim_loss:.4f}, Lat. Loss: {latent_loss:.4f}, Recon. Loss: {image_loss:.4f}'.format(
+                '  epoch: {epoch} [{n}/{N} ({per:.0f}%)]\tLoss: {total_loss:.4f}, Beta * Disc. Loss: {discrim_loss:.4f}, Lat. Loss: {latent_loss:.4f}, Recon. Loss: {image_loss:.4f}'.format(
                 epoch = epoch,
                 n     = batch_idx * train_loader.batch_size,
                 N     = len(train_loader.dataset),
                 per   = 100. * batch_idx / len(train_loader),
-                total_loss  = loss[0].data.item() / len(data),
-                discrim_loss = loss[0].data.item() / len(data) - 
-                    loss[1].data.item() / len(data), # DRVAE - VAE
-                latent_loss = loss[2].data.item() / len(data),
-                image_loss = loss[3].data.item() / len(data),
+                total_loss  = loss_tuple[0].data.item() / len(data),
+                discrim_loss = loss_tuple[0].data.item() / len(data) - 
+                    loss_tuple[1].data.item() / len(data), # DRVAE - VAE
+                latent_loss = loss_tuple[2].data.item() / len(data),
+                image_loss = loss_tuple[3].data.item() / len(data),
                 ))
                 
 

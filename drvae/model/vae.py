@@ -231,7 +231,8 @@ class ConvDRVAE(ConvVAE):
     """ adds a discriminative model and an associated penalty """
     def set_discrim_model(self, discrim_model, 
                           discrim_beta,
-                          dim_out_to_use):
+                          dim_out_to_use,
+                          disc_output_type):
         # assert that there are 0 trainalbe params in discrim model
         assert(len(list(filter(lambda p: p.requires_grad, 
                                 discrim_model.parameters())))==0)
@@ -239,7 +240,17 @@ class ConvDRVAE(ConvVAE):
         self.discrim_model = discrim_model # changed from [discrim_model]
         self.discrim_beta = discrim_beta
         self.dim_out_to_use = dim_out_to_use # choose dimension of the discrim output
-
+        self.disc_output_type = disc_output_type # `probs`| `logits`
+        print('Expecting output: %s' % self.disc_output_type)
+        if self.disc_output_type == "probs":
+            with torch.no_grad():
+                test_tensor = torch.tensor(np.random.uniform(
+                    low=-1024.0, high = 1024.0, size = (256,1,224,224)
+                    ), dtype = torch.float).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+                test_out = self.discrim_model(test_tensor)[:, self.dim_out_to_use].clone().cpu()
+                assert (test_out>0).all() and (test_out<1).all()
+                del test_out, test_tensor
+                
     def lossfun(self, data, 
                 recon_data, target, 
                 mu, logvar, 
@@ -258,8 +269,9 @@ class ConvDRVAE(ConvVAE):
             vae_loss: torch.float, vae_loss = image_loss + latent_loss
             latent_loss: torch.float, KL(q,p)
             image_loss: torch.float, negative-log-like of the diff recon_data-data.
+            disc_loss: torch.float, NOT multiplied by beta.
         in any case we minimize just the first element, drvae_loss. 
-        disc_loss can be obtained by subtracting drvae_loss - vae_loss.
+        effective disc_loss can be obtained by subtracting drvae_loss - vae_loss.
         """
         # vae ELBO loss
         vae_loss, latent_loss, image_loss = super(ConvDRVAE, self).loss_fun(
@@ -270,24 +282,28 @@ class ConvDRVAE(ConvVAE):
                             scale_down_image_loss)
 
         if self.discrim_beta == 0:
-            return vae_loss, vae_loss, latent_loss, image_loss
-
-        # push data and recond through discrim_model
-        # Here output is assumed on the logit scale.
+            return vae_loss, vae_loss, latent_loss, image_loss, None
         
-        zdiscrim_data  = self.discrim_model(data)[:, self.dim_out_to_use]
-        zdiscrim_recon = self.discrim_model(recon_data)[:, self.dim_out_to_use]
-
-        disc_loss = self.discrim_beta * \
-            torch.sum((zdiscrim_data
-                       -zdiscrim_recon)**2)
+        if self.disc_output_type == "probs":
+            # push data and recon through discrim_model
+            p_data =  self.discrim_model(data)[:, self.dim_out_to_use]
+            q_recon = self.discrim_model(recon_data)[:, self.dim_out_to_use]
+            disc_loss = torch.sum(kldiv_bernoulli(q_recon, p_data))
+            weighted_disc_loss = self.discrim_beta * disc_loss
+        
+        elif self.disc_output_type == "logits":
+            # discriminator output on the logit scale.
+            zdiscrim_data  = self.discrim_model(data)[:, self.dim_out_to_use]
+            zdiscrim_recon = self.discrim_model(recon_data)[:, self.dim_out_to_use]
+            disc_loss = torch.sum((zdiscrim_data
+                           -zdiscrim_recon)**2)
         
         assert ~np.isnan(vae_loss.clone().detach().cpu())
-        assert ~np.isnan(disc_loss.clone().detach().cpu())
+        assert ~np.isnan(weighted_disc_loss.clone().detach().cpu())
         
-        drvae_loss = vae_loss + disc_loss
-
-        return drvae_loss, vae_loss, latent_loss, image_loss
+        drvae_loss = vae_loss + weighted_disc_loss
+        
+        return drvae_loss, vae_loss, latent_loss, image_loss, disc_loss
     
         # # # previously: vae ELBO loss
         # if scale_down_image_loss:
@@ -742,3 +758,6 @@ def decode_batch_list(mod, zmat, batch_size=256):
         batch_res.append(res.data.cpu())
 
     return torch.cat(batch_res, dim=0)
+
+
+
