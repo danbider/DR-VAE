@@ -247,8 +247,8 @@ class ConvDRVAE(ConvVAE):
                 test_tensor = torch.tensor(np.random.uniform(
                     low=-1024.0, high = 1024.0, size = (256,1,224,224)
                     ), dtype = torch.float).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-                test_out = self.discrim_model(test_tensor)[:, self.dim_out_to_use].clone().cpu()
-                assert (test_out>0).all() and (test_out<1).all()
+                test_out = self.discrim_model(test_tensor)[:, self.dim_out_to_use]
+                assert (test_out.clone().cpu()>0).all() and (test_out.clone().cpu()<1).all()
                 del test_out, test_tensor
                 
     def lossfun(self, data, 

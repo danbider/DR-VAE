@@ -302,27 +302,28 @@ def train_epoch_xraydata(epoch, model, train_loader,
                                       output_dir)
         
         # add errors from each batch to the total train_loss of epoch
-        recon_rmse += torch.std(recon_batch-data).data.item()*data.shape[0]
-        train_loss += loss_tuple[0].data.item()*data.shape[0]
-        kl_loss += loss_tuple[2].data.item()*data.shape[0]
-        if hasattr(model, "discrim_model"):
-            discrim_loss += loss_tuple[4].data.item()*data.shape[0] # NOT weighted by beta
-        else: 
-            discrim_loss += 0.0
-
-        if (log_interval is not None) and (batch_idx % log_interval == 0):
-            print(
-                '  epoch: {epoch} [{n}/{N} ({per:.0f}%)]\tLoss: {total_loss:.4f}, Beta * Disc. Loss: {discrim_loss:.4f}, Lat. Loss: {latent_loss:.4f}, Recon. Loss: {image_loss:.4f}'.format(
-                epoch = epoch,
-                n     = batch_idx * train_loader.batch_size,
-                N     = len(train_loader.dataset),
-                per   = 100. * batch_idx / len(train_loader),
-                total_loss  = loss_tuple[0].data.item() / len(data),
-                discrim_loss = loss_tuple[0].data.item() / len(data) - 
-                    loss_tuple[1].data.item() / len(data), # DRVAE - VAE
-                latent_loss = loss_tuple[2].data.item() / len(data),
-                image_loss = loss_tuple[3].data.item() / len(data),
-                ))
+        with torch.no_grad:
+            recon_rmse += torch.std(recon_batch-data).data.item()*data.shape[0]
+            train_loss += loss_tuple[0].data.item()*data.shape[0]
+            kl_loss += loss_tuple[2].data.item()*data.shape[0]
+            if hasattr(model, "discrim_model"):
+                discrim_loss += loss_tuple[4].data.item()*data.shape[0] # NOT weighted by beta
+            else: 
+                discrim_loss += 0.0
+    
+            if (log_interval is not None) and (batch_idx % log_interval == 0):
+                print(
+                    '  epoch: {epoch} [{n}/{N} ({per:.0f}%)]\tLoss: {total_loss:.4f}, Beta * Disc. Loss: {discrim_loss:.4f}, Lat. Loss: {latent_loss:.4f}, Recon. Loss: {image_loss:.4f}'.format(
+                    epoch = epoch,
+                    n     = batch_idx * train_loader.batch_size,
+                    N     = len(train_loader.dataset),
+                    per   = 100. * batch_idx / len(train_loader),
+                    total_loss  = loss_tuple[0].data.item() / len(data),
+                    discrim_loss = loss_tuple[0].data.item() / len(data) - 
+                        loss_tuple[1].data.item() / len(data), # DRVAE - VAE
+                    latent_loss = loss_tuple[2].data.item() / len(data),
+                    image_loss = loss_tuple[3].data.item() / len(data),
+                    ))
                 
 
     # compute average loss
