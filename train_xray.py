@@ -27,7 +27,6 @@ import inspect
 import cv2
 current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
-os.chdir(parent_dir)
 
 # insert at 1, 0 is the script path (or '' in REPL)
 #sys.path.insert(1, os.path.join(parent_dir, 'torchxrayvision/torchxrayvision'))
