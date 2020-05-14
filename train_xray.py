@@ -7,13 +7,15 @@ Created on Thu Apr 23 09:11:42 2020
 Train a DR-VAE, or just a VAE, on chest x-ray data.
 When I want to test multiple betas, take a look at synthetic_experiment.py
 """
+# need to install torchxrayvision package from Dan's github, see https://stackoverflow.com/questions/15268953/how-to-install-python-package-from-github
+import os
+os.system('pip install git+https://github.com/danbider/torchxrayvision.git')
 import torch
 from torch import nn
-
-#print(torch.__version__)
 import torchvision
+import torchxrayvision as xrv # package that was just installed.
+#print(torch.__version__)
 #print(torchvision.__version__)
-import torchxrayvision as xrv
 import numpy as np
 #import matplotlib.pyplot as plt
 #import commentjson
@@ -25,6 +27,10 @@ import inspect
 import cv2
 current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
+os.chdir(parent_dir)
+
+# insert at 1, 0 is the script path (or '' in REPL)
+#sys.path.insert(1, os.path.join(parent_dir, 'torchxrayvision/torchxrayvision'))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--training-outcome", default='gaussian', help='what to predict')
@@ -81,11 +87,11 @@ if not os.path.exists(output_dir):
 # define an image transformation for the dataset (in addition to torchxrayvision)
 # note, didn't xrv's XRayResizer.
 transform = torchvision.transforms.Compose(
-    [xrv.datasets.XRayCenterCrop(),
+    [xrv.datasets.XRayCenterCrop(), # # can change back to xrv.datasets if import package
       XRayResizer(args.image_size)]) # typically 224
 
 # initialize a torchxrayvision dataset instance
-d_kaggle = xrv.datasets.Kaggle_Dataset(
+d_kaggle = xrv.datasets.Kaggle_Dataset( # can change back to xrv.datasets if import package
     imgpath=os.path.join(parent_dir, 'xray-datasets', 'kaggle-pneumonia-jpg',
                           'stage_2_train_images_jpg'),
     csvpath=os.path.join(parent_dir, 'xray-datasets', 'kaggle-pneumonia-jpg',
@@ -119,7 +125,7 @@ if args.vae_only == True: # if just vae
 else:
     print('fitting a DR-VAE model.')
     # load discriminator, send to cuda, and set to eval mode (no dropout etc)
-    discriminator = xrv.models.DenseNet(weights="all").to(device).eval()
+    discriminator = xrv.models.DenseNet(weights="all").to(device).eval() # can change to xrv.models in future
     # discriminator.op_threshs = None
     # freeze discriminator weights.
     for param in discriminator.parameters():
