@@ -9,7 +9,7 @@ When I want to test multiple betas, take a look at synthetic_experiment.py
 """
 # need to install torchxrayvision package from Dan's github, see https://stackoverflow.com/questions/15268953/how-to-install-python-package-from-github
 import os
-os.system('pip install git+https://github.com/danbider/torchxrayvision.git')
+os.system('pip install --upgrade git+https://github.com/danbider/torchxrayvision.git')
 import torch
 from torch import nn
 import torchvision
