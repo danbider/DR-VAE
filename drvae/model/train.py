@@ -31,6 +31,7 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     cond_dim      = kwargs.get("cond_dim", 1)
     zu_dropout_p  = kwargs.get("zu_dropout_p", .2)
     log_interval  = kwargs.get("log_interval", None)
+    run_validation_interval  = kwargs.get("run_validation_interval", 2)
     learning_rate = kwargs.get("lr", 1e-3)
     lr_reduce_interval = kwargs.get("lr_reduce_interval", 25)
     epoch_log_interval = kwargs.get("epoch_log_interval", 1)
@@ -40,7 +41,8 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     scale_down_image_loss = kwargs.get("scale_down_image_loss", 
                                        False)
     anneal_rate = kwargs.get("anneal_rate", 0.005)
-    num_zero_kl_epochs = kwargs.get("num_zero_kl_epochs", 20)
+    num_zero_kl_epochs = kwargs.get("num_zero_kl_epochs", 0)
+    min_train_epochs = kwargs.get("min_train_epochs", 40)
     #data_dim   = Xtrain.shape[1]
     print("-------------------")
     print("fitting vae: ", kwargs)
@@ -87,15 +89,21 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     # main training loop
     best_val_loss, best_val_state = np.inf, None
     prev_val_loss = np.inf
-    train_elbo = []
+    train_total_loss = []
     train_kl = []
     train_disc_loss = []
-    val_elbo = []
+    val_total_loss = []
     val_kl = []
     val_disc_loss = []
     print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
         "Epoch", "train-loss", "val-loss", "train-rmse", "val-rmse", "train/val-p"))
-    for epoch in range(1, epochs + 1):
+    
+    # initialize early stopping class. note -- patience is a function of run_validation_interval. 
+    # if we're running validation every 5 epochs, than patience = 3 stops when there's no improvement in the last 15 
+    # epochs. 
+    early_stopping = EarlyStopping(patience=3, verbose=True, output_dir=output_dir)
+
+    for epoch in range(1, epochs + 1): 
         
         # set beta for kl loss, start with 20 epochs with 0 loss, than gradually
         # add the KL term
@@ -110,36 +118,76 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
                                             scale_down_image_loss=scale_down_image_loss,
                                             kl_beta = kl_beta,
                                             output_dir = output_dir)
+        # # works copying and modifying below
+        # print('Finished training epoch %i' % epoch)
+        # print('Predicting validation dataset...')
+        # vloss, vrmse, vprecon, v_kl_loss, v_disc_loss = test_epoch_func(epoch, model, 
+        #                             val_loader, do_cuda, 
+        #                             scale_down_image_loss=scale_down_image_loss,
+        #                             kl_beta = kl_beta,
+        #                             output_dir = output_dir)
         
-        print('Finished training epoch %i' % epoch)
-        print('Predicting validation dataset...')
-        vloss, vrmse, vprecon, v_kl_loss, v_disc_loss = test_epoch_func(epoch, model, 
+        # print('Finished.')
+        
+        if epoch % run_validation_interval ==0:
+            
+            print('Finished training epoch %i' % epoch)
+            print('Predicting validation dataset...')
+            vloss, vrmse, vprecon, v_kl_loss, v_disc_loss = test_epoch_func(epoch, model, 
                                     val_loader, do_cuda, 
                                     scale_down_image_loss=scale_down_image_loss,
                                     kl_beta = kl_beta,
                                     output_dir = output_dir)
         
-        print('Finished.')
-        
-        if epoch % epoch_log_interval == 0:
-
+            print('Finished.')
+            
+            # keep track of best model by validation rmse
+            # ToDo: currently implemented also in the Early_Stopping class. pick one.
+            if vrmse < best_val_loss:
+                best_val_loss, best_val_state = vrmse, model.state_dict()
+            
+            # track elbo values
+            train_total_loss.append(tloss)
+            train_kl.append(t_kl_loss)
+            train_disc_loss.append(t_disc_loss)
+            val_total_loss.append(vloss)
+            val_kl.append(v_kl_loss)
+            val_disc_loss.append(v_disc_loss)
+            
             print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
               epoch, "%2.4f"%tloss, "%2.4f"%vloss, 
               "%2.4f"%trmse, "%2.4f"%vrmse,
               "%2.3f / %2.3f"%(tprecon, vprecon)))
             print('logging losses.')
+            
+            if kl_beta>=1.0: # make sure we reached the full VAE loss.
+                early_stopping(vloss, model)
+                # early_stopping needs the validation loss to check if it has decresed, 
+                # and if it has, it will make a checkpoint of the current model
+        
+        if early_stopping.early_stop:
+            print("Early stopping")
+            break
+        
+        # if epoch % epoch_log_interval == 0:
 
-            # track elbo values
-            train_elbo.append(tloss)
-            train_kl.append(t_kl_loss)
-            train_disc_loss.append(t_disc_loss)
-            val_elbo.append(vloss)
-            val_kl.append(v_kl_loss)
-            val_disc_loss.append(v_disc_loss)
+        #     print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
+        #       epoch, "%2.4f"%tloss, "%2.4f"%vloss, 
+        #       "%2.4f"%trmse, "%2.4f"%vrmse,
+        #       "%2.3f / %2.3f"%(tprecon, vprecon)))
+        #     print('logging losses.')
 
-        # keep track of best model by validation rmse
-        if vrmse < best_val_loss:
-            best_val_loss, best_val_state = vrmse, model.state_dict()
+            # # track elbo values
+            # train_elbo.append(tloss)
+            # train_kl.append(t_kl_loss)
+            # train_disc_loss.append(t_disc_loss)
+            # val_elbo.append(vloss)
+            # val_kl.append(v_kl_loss)
+            # val_disc_loss.append(v_disc_loss)
+
+        # # keep track of best model by validation rmse # works, just doing it every few epochs.
+        # if vrmse < best_val_loss:
+        #     best_val_loss, best_val_state = vrmse, model.state_dict()
 
         # update learning rate if we're not doing better
         if epoch % lr_reduce_interval == 0: # 100 and vloss >= prev_val_loss:
@@ -153,21 +201,22 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
             #     output_file = os.path.join(output_dir, "train-recon-%d.png"%epoch))
             # save_reconstruction(model, val_data,
             #     output_file = os.path.join(output_dir, "val-recon-%d.png"%epoch))
-            save_elbo_plots(train_elbo, val_elbo, output_dir)
+            save_elbo_plots(train_total_loss, val_total_loss, output_dir)
             #torch.save({'train_elbo' : train_elbo,
             #            'val_elbo'   : val_elbo,
             #            'state_dict' : model.state_dict(),
             #            'optimizer'  : optimizer.state_dict()},
             #            f=os.path.join(output_dir, model.name() + ".pth.tar"))
+            
 
     # load in best state by validation loss
     model.load_state_dict(best_val_state)
     model.eval()
 
-    resdict = {'train_elbo'   : train_elbo,
+    resdict = {'train_total_loss'   : train_total_loss,
                'train_kl' : train_kl,
                'train_disc_loss': train_disc_loss,
-               'val_elbo'     : val_elbo,
+               'val_total_loss'     : val_total_loss,
                'val_kl' : val_kl,
                'val_disc_loss': val_disc_loss,
                #'model_state'  : model.state_dict(),
@@ -628,6 +677,52 @@ def save_critical_tensors(data, recon_batch,  mu,
     torch.save(z, os.path.join(save_dir, 'z_batch.pt'))
     
     print('Critical tensors saved in %s' % str(save_dir))
+    
+class EarlyStopping:
+    """https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
+    Early stops the training if validation loss doesn't improve after a given patience."""
+    def __init__(self, patience=7, verbose=False, delta=0, output_dir = None):
+        """
+        Args:
+            patience (int): How long to wait after last time validation loss improved.
+                            Default: 7
+            verbose (bool): If True, prints a message for each validation loss improvement. 
+                            Default: False
+            delta (float): Minimum change in the monitored quantity to qualify as an improvement.
+                            Default: 0
+        """
+        self.patience = patience
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = np.Inf
+        self.delta = delta
+        self.output_dir = output_dir
+
+    def __call__(self, val_loss, model):
+
+        score = -val_loss
+
+        if self.best_score is None:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model)
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model)
+            self.counter = 0
+
+    def save_checkpoint(self, val_loss, model):
+        '''Saves model when validation loss decrease.'''
+        if self.verbose:
+            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+        torch.save(model.state_dict(), os.path.join(self.output_dir, 'checkpoint.pt'))
+        self.val_loss_min = val_loss
     
 ## ==== some debugging prints
     
