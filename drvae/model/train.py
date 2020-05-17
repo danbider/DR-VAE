@@ -42,7 +42,6 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
                                        False)
     anneal_rate = kwargs.get("anneal_rate", 0.005)
     num_zero_kl_epochs = kwargs.get("num_zero_kl_epochs", 0)
-    min_train_epochs = kwargs.get("min_train_epochs", 40)
     #data_dim   = Xtrain.shape[1]
     print("-------------------")
     print("fitting vae: ", kwargs)
