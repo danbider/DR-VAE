@@ -158,7 +158,6 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
               epoch, "%2.4f"%tloss, "%2.4f"%vloss, 
               "%2.4f"%trmse, "%2.4f"%vrmse,
               "%2.3f / %2.3f"%(tprecon, vprecon)))
-            print('logging losses.')
             
             if kl_beta>=1.0: # make sure we reached the full VAE loss.
                 early_stopping(vloss, model)
