@@ -208,8 +208,12 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
             
 
     # load in best state by validation loss
-    model.load_state_dict(best_val_state)
-    model.eval()
+    # ToDo: keep in mind that we now have the early stopping class.
+    if best_val_state is not None:
+        model.load_state_dict(best_val_state)
+        model.eval()
+    else: 
+        print('best_val_state is None. We cannot load_state_dict before exiting -- keeping the current state_dict')
 
     resdict = {'train_total_loss'   : train_total_loss,
                'train_kl' : train_kl,
