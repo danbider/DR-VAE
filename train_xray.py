@@ -118,26 +118,20 @@ arch_dict = load_handcrafted_arch(ae_arch_json=os.path.join(
 
 # define DRVAE model - if args.beta=0, just VAE
 model = ConvDRVAE(arch_dict, # TODO: maybe arch_dict should be first, check
-                  discrim_beta = args.beta,
                   scale_pixels = True,
                   loglike_function = args.recon_like_function)
+discriminator = xrv.models.DenseNet(weights="all").to(device).eval() # can change to xrv.models in future
+for param in discriminator.parameters():
+         param.requires_grad = False
+model.set_discrim_model(discriminator, 
+                        discrim_beta = args.beta, 
+                        dim_out_to_use=8, 
+                        disc_output_type = 'probs')
 if args.beta == 0: # if just vae, previously args.vae_only=True
     print('fitting just VAE.')
 else:
     print('fitting a DR-VAE model.')
-    # load discriminator, send to cuda, and set to eval mode (no dropout etc)
-    discriminator = xrv.models.DenseNet(weights="all").to(device).eval() # can change to xrv.models in future
-    # discriminator.op_threshs = None
-    # freeze discriminator weights.
-    for param in discriminator.parameters():
-            param.requires_grad = False
-    # # define DRVAE model
-    # model = ConvDRVAE(arch_dict, 
-    #               scale_pixels = True,
-    #               loglike_function = args.recon_like_function)
-    model.set_discrim_model(discriminator, #discrim_beta = args.beta, # removed
-                            dim_out_to_use=8, 
-                            disc_output_type = 'probs')
+
 
 # previous version that worked.
 # if args.beta == 0: # if just vae, previously args.vae_only=True
