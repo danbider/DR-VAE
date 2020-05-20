@@ -116,7 +116,7 @@ arch_dict = load_handcrafted_arch(ae_arch_json=os.path.join(
                                   n_ae_latents=args.num_latents,
                                   check_memory=False)
 
-if args.vae_only == True: # if just vae
+if args.beta == 0: # if just vae, previously args.vae_only=True
     print('fitting just VAE.')
     model = ConvVAE(arch_dict, 
               scale_pixels = True,
