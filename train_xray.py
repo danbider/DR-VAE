@@ -135,8 +135,7 @@ else:
     # model = ConvDRVAE(arch_dict, 
     #               scale_pixels = True,
     #               loglike_function = args.recon_like_function)
-    model.set_discrim_model(discriminator, 
-                            discrim_beta = args.beta,
+    model.set_discrim_model(discriminator, #discrim_beta = args.beta, # removed
                             dim_out_to_use=8, 
                             disc_output_type = 'probs')
 
