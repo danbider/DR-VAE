@@ -356,7 +356,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
         recon_rmse += torch.std(recon_batch-data).data.item()*data.shape[0]
         train_loss += loss_tuple[0].data.item()*data.shape[0]
         kl_loss += loss_tuple[2].data.item()*data.shape[0]
-        if hasattr(model, "discrim_model"):
+        if model.beta != 0:
             discrim_loss += loss_tuple[4].data.item()*data.shape[0] # NOT weighted by beta
         else: 
             discrim_loss += 0.0
