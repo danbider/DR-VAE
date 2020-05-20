@@ -229,9 +229,9 @@ class ConvVAE(VAE):
     
 class ConvDRVAE(ConvVAE):
     """ adds a discriminative model and an associated penalty """
-    def __init__(self, **kwargs):
+    def __init__(self, discrim_beta, **kwargs):
         super(ConvDRVAE, self).__init__(**kwargs)
-        self.discrim_beta = kwargs.get("discrim_beta", 0)
+        self.discrim_beta = discrim_beta
         
     def set_discrim_model(self, discrim_model, # discrim_beta,
                           dim_out_to_use,

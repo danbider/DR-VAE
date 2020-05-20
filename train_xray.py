@@ -117,10 +117,9 @@ arch_dict = load_handcrafted_arch(ae_arch_json=os.path.join(
                                   check_memory=False)
 
 # define DRVAE model - if args.beta=0, just VAE
-model = ConvDRVAE(arch_dict, 
+model = ConvDRVAE(args.beta, arch_dict, # TODO: maybe arch_dict should be first, check
                   scale_pixels = True,
-                  loglike_function = args.recon_like_function,
-                  discrim_beta = args.beta)
+                  loglike_function = args.recon_like_function)
 if args.beta == 0: # if just vae, previously args.vae_only=True
     print('fitting just VAE.')
 else:
