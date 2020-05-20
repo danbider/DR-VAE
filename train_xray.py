@@ -115,11 +115,12 @@ arch_dict = load_handcrafted_arch(ae_arch_json=os.path.join(
                                   input_dim=np.array([1, args.image_size, args.image_size]), # was np.array([1, 223, 223])
                                   n_ae_latents=args.num_latents,
                                   check_memory=False)
-# define DRVAE model
 
+# define DRVAE model - if args.beta=0, just VAE
 model = ConvDRVAE(arch_dict, 
                   scale_pixels = True,
-                  loglike_function = args.recon_like_function)
+                  loglike_function = args.recon_like_function,
+                  discrim_beta = args.beta)
 if args.beta == 0: # if just vae, previously args.vae_only=True
     print('fitting just VAE.')
 else:
@@ -130,11 +131,10 @@ else:
     # freeze discriminator weights.
     for param in discriminator.parameters():
             param.requires_grad = False
-    
-    # define DRVAE model
-    model = ConvDRVAE(arch_dict, 
-                  scale_pixels = True,
-                  loglike_function = args.recon_like_function)
+    # # define DRVAE model
+    # model = ConvDRVAE(arch_dict, 
+    #               scale_pixels = True,
+    #               loglike_function = args.recon_like_function)
     model.set_discrim_model(discriminator, 
                             discrim_beta = args.beta,
                             dim_out_to_use=8, 

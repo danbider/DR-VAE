@@ -229,8 +229,11 @@ class ConvVAE(VAE):
     
 class ConvDRVAE(ConvVAE):
     """ adds a discriminative model and an associated penalty """
-    def set_discrim_model(self, discrim_model, 
-                          discrim_beta,
+    def __init__(self, discrim_beta, **kwargs):
+        super(ConvDRVAE, self).__init__(**kwargs)
+        self.discrim_beta = discrim_beta
+        
+    def set_discrim_model(self, discrim_model, # discrim_beta,
                           dim_out_to_use,
                           disc_output_type):
         # assert that there are 0 trainalbe params in discrim model
@@ -238,7 +241,7 @@ class ConvDRVAE(ConvVAE):
                                 discrim_model.parameters())))==0)
         
         self.discrim_model = discrim_model # changed from [discrim_model]
-        self.discrim_beta = discrim_beta
+        #self.discrim_beta = discrim_beta # replaced with init. ToDo: verify
         self.dim_out_to_use = dim_out_to_use # choose dimension of the discrim output
         self.disc_output_type = disc_output_type # `probs`| `logits`
         print('Expecting output: %s' % self.disc_output_type)
