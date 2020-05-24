@@ -91,9 +91,12 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     train_total_loss = []
     train_kl = []
     train_disc_loss = []
+    train_neg_ll = []
     val_total_loss = []
     val_kl = []
     val_disc_loss = []
+    val_neg_ll = [] # quantity that we're minimizing, propto MSE
+    kl_beta = [] # kl beta, increases in the annealing procedure.
     print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
         "Epoch", "train-loss", "val-loss", "train-rmse", "val-rmse", "train/val-p"))
     
@@ -109,7 +112,7 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
         kl_beta = kl_schedule(epoch, num_zero_kl_epochs, anneal_rate) 
 
         # train/val over entire dataset
-        tloss, trmse, tprecon, t_kl_loss, t_disc_loss = train_epoch_func(epoch, model, train_loader,
+        tloss, trmse, tprecon, t_kl_loss, t_disc_loss, t_neg_ll = train_epoch_func(epoch, model, train_loader,
                                             optimizer     = optimizer,
                                             do_cuda       = do_cuda,
                                             log_interval  = log_interval,
@@ -132,7 +135,7 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
             
             print('Finished training epoch %i' % epoch)
             print('Predicting validation dataset...')
-            vloss, vrmse, vprecon, v_kl_loss, v_disc_loss = test_epoch_func(epoch, model, 
+            vloss, vrmse, vprecon, v_kl_loss, v_disc_loss, v_neg_ll = test_epoch_func(epoch, model, 
                                     val_loader, do_cuda, 
                                     scale_down_image_loss=scale_down_image_loss,
                                     kl_beta = kl_beta,
@@ -149,9 +152,13 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
             train_total_loss.append(tloss)
             train_kl.append(t_kl_loss)
             train_disc_loss.append(t_disc_loss)
+            train_neg_ll.append(t_neg_ll)
             val_total_loss.append(vloss)
             val_kl.append(v_kl_loss)
             val_disc_loss.append(v_disc_loss)
+            val_neg_ll.append(v_neg_ll)
+            kl_beta.append(kl_beta)
+
             
             print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
               epoch, "%2.4f"%tloss, "%2.4f"%vloss, 
@@ -260,6 +267,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
     recon_rmse = 0.
     kl_loss = 0.
     discrim_loss = 0.
+    image_neg_ll = 0.0
     recon_prob_sse, recon_z_sse = 0., 0.
     loss_list = [] # renewed every epoch for debugging
     latent_loss_list = []
@@ -356,6 +364,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
         recon_rmse += torch.std(recon_batch-data).data.item()*data.shape[0]
         train_loss += loss_tuple[0].data.item()*data.shape[0]
         kl_loss += loss_tuple[2].data.item()*data.shape[0]
+        image_neg_ll += loss_tuple[3].data.item()*data.shape[0]
         if model.discrim_beta != 0:
             discrim_loss += loss_tuple[4].data.item()*data.shape[0] # NOT weighted by beta
         else: 
@@ -378,7 +387,7 @@ def train_epoch_xraydata(epoch, model, train_loader,
 
     # compute average loss
     N = len(train_loader.dataset)
-    return train_loss/N, recon_rmse/N, np.sqrt(recon_prob_sse/N), kl_loss/N, discrim_loss/N
+    return train_loss/N, recon_rmse/N, np.sqrt(recon_prob_sse/N), kl_loss/N, discrim_loss/N, image_neg_ll/N
 
 def test_epoch_xraydata(epoch, model, data_loader, 
                         do_cuda, scale_down_image_loss, 
