@@ -96,7 +96,7 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
     val_kl = []
     val_disc_loss = []
     val_neg_ll = [] # quantity that we're minimizing, propto MSE
-    kl_beta = [] # kl beta, increases in the annealing procedure.
+    kl_beta_list = [] # kl beta, increases in the annealing procedure.
     print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
         "Epoch", "train-loss", "val-loss", "train-rmse", "val-rmse", "train/val-p"))
     
@@ -157,7 +157,7 @@ def fit_vae(model, Xtrain, Xval, Xtest, Ytrain, Yval, Ytest, **kwargs):
             val_kl.append(v_kl_loss)
             val_disc_loss.append(v_disc_loss)
             val_neg_ll.append(v_neg_ll)
-            kl_beta.append(kl_beta)
+            kl_beta_list.append(kl_beta)
 
             
             print("{:10}  {:10}  {:10}  {:10}  {:10}  {:10}".format(
